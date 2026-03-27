@@ -1,16 +1,28 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { BitmapService } from '../services/BitmapService';
 import bitmapsRouter from './bitmapsRoutes';
 import walletRouter from './walletRoutes';
 import transactionRouter from './transactionRoutes';
 import { sendSuccess } from '../utils/responseFormatter';
-import { Request, Response } from 'express';
 
-const router = Router();
+const router: Router = Router();
 const bitmapService = new BitmapService();
 
-router.get('/health', (req: Request, res: Response) => {
-  sendSuccess(res, { status: 'ok', timestamp: Date.now() });
+router.get('/health', (_req: Request, res: Response) => {
+  sendSuccess(res, { 
+    status: 'ok', 
+    timestamp: Date.now(),
+    version: 'v1',
+    api: 'BitmapCorp API v1'
+  });
+});
+
+router.get('/version', (_req: Request, res: Response) => {
+  sendSuccess(res, {
+    version: 'v1',
+    endpoints: '/api/v1',
+    documentation: 'https://docs.bitmapcorp.app/v1'
+  });
 });
 
 router.get('/verify-bitmap/:id', async (req: Request, res: Response) => {

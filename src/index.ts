@@ -1,6 +1,6 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, Express } from 'express';
 import { config } from './config/environment';
-import { corsOptions } from './config/cors';
+import { corsMiddleware } from './config/cors';
 import { securityHeaders } from './middleware/securityHeaders';
 import { generalLimiter, purchaseLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
@@ -9,21 +9,21 @@ import { initDb, closeDb } from './database/db';
 import { logger } from './utils/logger';
 import { IdempotencyRepository } from './repositories/IdempotencyRepository';
 
-const app = express();
+const app: Express = express();
 
 app.use(securityHeaders);
-app.use(corsOptions);
+app.use(corsMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use(generalLimiter);
 
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ success: true, data: { status: 'ok', timestamp: Date.now() } });
 });
 
 app.use('/api', purchaseLimiter);
-app.use('/api', apiRoutes);
+app.use('/api/v1', apiRoutes);
 
 app.use(errorHandler);
 

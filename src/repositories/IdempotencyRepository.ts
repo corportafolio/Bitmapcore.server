@@ -1,5 +1,4 @@
 import { getDb } from '../database/db';
-import { config } from '../config/environment';
 
 interface IdempotencyRow {
   key: string;

@@ -3,7 +3,7 @@ import { TransactionService } from '../services/TransactionService';
 import { sendSuccess, sendValidationError } from '../utils/responseFormatter';
 import { isValidBitcoinAddress } from '../utils/bitcoinValidator';
 
-const router = Router();
+const router: Router = Router();
 const transactionService = new TransactionService();
 
 router.get('/:address/balance', async (req: Request, res: Response) => {

@@ -3,7 +3,7 @@ import { TransactionService } from '../services/TransactionService';
 import { validateBody, buyBitmapSchema, broadcastSchema, validateUUID } from '../middleware/validation';
 import { sendSuccess } from '../utils/responseFormatter';
 
-const router = Router();
+const router: Router = Router();
 const transactionService = new TransactionService();
 
 router.post('/buy-bitmap', validateBody(buyBitmapSchema), async (req: Request, res: Response) => {

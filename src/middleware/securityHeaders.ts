@@ -20,8 +20,8 @@ export const securityHeaders = helmet({
     includeSubDomains: true,
     preload: isProduction,
   },
-  xFrameOptions: 'DENY',
-  xContentTypeOptions: 'nosniff',
-  referrerPolicy: 'strict-origin-when-cross-origin',
+  xFrameOptions: { action: 'deny' },
+  xContentTypeOptions: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   hidePoweredBy: true,
 });

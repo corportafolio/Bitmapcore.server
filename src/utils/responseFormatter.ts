@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { ApiResponse, ApiSuccess, ApiError } from '../types/api';
+import { ApiSuccess, ApiError } from '../types/api';
 
 export function success<T>(data: T): ApiSuccess<T> {
   return {

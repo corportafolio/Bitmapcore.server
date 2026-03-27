@@ -3,11 +3,11 @@ import { TransactionRepository } from '../repositories/TransactionRepository';
 import { IdempotencyRepository } from '../repositories/IdempotencyRepository';
 import { ListingRepository } from '../repositories/ListingRepository';
 import { MempoolService } from './MempoolService';
-import { Transaction, TransactionBroadcast, PSBTCreate, TransactionStatusResponse } from '../types/transaction';
+import { PSBTCreate, TransactionStatusResponse } from '../types/transaction';
 import { config } from '../config/environment';
 import { logger } from '../utils/logger';
 import { isValidBitcoinAddress } from '../utils/bitcoinValidator';
-import { ValidationError, NotFoundError, IdempotencyError, ExternalApiError } from '../errors/AppError';
+import { ValidationError, NotFoundError, ExternalApiError } from '../errors/AppError';
 
 export class TransactionService {
   private transactionRepo: TransactionRepository;

@@ -4,7 +4,7 @@ import { validateBody, createListingSchema, updateListingSchema, validateUUID } 
 import { sendSuccess, sendNotFound } from '../utils/responseFormatter';
 import { BitmapListingCreate, BitmapListingUpdate } from '../types/bitmap';
 
-const router = Router();
+const router: Router = Router();
 const bitmapService = new BitmapService();
 
 router.get('/', async (req: Request, res: Response) => {

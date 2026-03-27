@@ -1,6 +1,5 @@
 import rateLimit from 'express-rate-limit';
 import { config } from '../config/environment';
-import { sendRateLimit } from '../utils/responseFormatter';
 
 export const purchaseLimiter = rateLimit({
   windowMs: config.rateLimit.purchaseWindowMs,

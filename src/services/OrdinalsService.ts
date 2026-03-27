@@ -25,7 +25,7 @@ export class OrdinalsService {
         'Ordinals API verify'
       );
 
-      const isBitmap = response.body && response.body.includes('bitmap');
+      const isBitmap = Boolean(response.body && response.body.includes('bitmap'));
 
       logger.info('Bitmap verification result', {
         inscriptionId,
