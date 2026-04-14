@@ -37,6 +37,7 @@ export const config = {
 
   database: {
     path: process.env.DB_PATH || './data/bitmapcorp.db',
+    blocksPath: process.env.BLOCKS_DB_PATH || './data/btc_bloques.db',
   },
 };
 

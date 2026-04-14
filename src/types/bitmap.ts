@@ -10,6 +10,11 @@ export interface BitmapListing {
   soldAt: number | null;
   imageUrl: string;
   isActive: boolean;
+  // Campos adicionales para BitmapCorp
+  bitmapNumber?: number;
+  inscriptionNumber?: number;
+  bitmapHash?: string;
+  ownerAddress?: string;
 }
 
 export interface BitmapListingCreate {
@@ -19,6 +24,10 @@ export interface BitmapListingCreate {
   name: string;
   description?: string;
   imageUrl: string;
+  bitmapNumber?: number;
+  inscriptionNumber?: number;
+  bitmapHash?: string;
+  ownerAddress?: string;
 }
 
 export interface BitmapListingUpdate {

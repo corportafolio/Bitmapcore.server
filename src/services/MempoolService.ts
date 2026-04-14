@@ -149,4 +149,22 @@ export class MempoolService {
       throw error;
     }
   }
+
+  async getInscriptionHash(inscriptionId: string): Promise<string | null> {
+    try {
+      const response = await withTimeout<{ txid: string }>(
+        axios.get<{ txid: string }>(
+          `${this.baseUrl}/inscription/${inscriptionId}`,
+          { timeout: this.timeout }
+        ).then(res => res.data),
+        this.timeout,
+        'Mempool API get inscription hash'
+      );
+
+      return response.txid;
+    } catch (error) {
+      logger.error('Error getting inscription hash', { inscriptionId, error });
+      return null;
+    }
+  }
 }

@@ -5,12 +5,26 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 let db: Database.Database | null = null;
+let blocksDb: Database.Database | null = null;
 
 export function getDb(): Database.Database {
   if (!db) {
     throw new Error('Database not initialized. Call initDb() first.');
   }
   return db;
+}
+
+export function getBlocksDb(): Database.Database {
+  if (!blocksDb) {
+    const dbPath = config.database.blocksPath;
+    if (!fs.existsSync(dbPath)) {
+      throw new Error(`Blocks database not found at: ${dbPath}`);
+    }
+    blocksDb = new Database(dbPath);
+    blocksDb.pragma('journal_mode = WAL');
+    logger.info('Blocks database connected', { path: dbPath });
+  }
+  return blocksDb;
 }
 
 export function initDb(): Database.Database {
@@ -47,7 +61,11 @@ function runMigrations(database: Database.Database): void {
       listed_at INTEGER NOT NULL,
       sold_at INTEGER,
       image_url TEXT NOT NULL,
-      is_active INTEGER DEFAULT 1
+      is_active INTEGER DEFAULT 1,
+      bitmap_number INTEGER,
+      inscription_number INTEGER,
+      bitmap_hash TEXT,
+      owner_address TEXT
     );
 
     CREATE TABLE IF NOT EXISTS transactions (
@@ -75,6 +93,7 @@ function runMigrations(database: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_listings_is_active ON listings(is_active);
     CREATE INDEX IF NOT EXISTS idx_listings_inscription_id ON listings(inscription_id);
+    CREATE INDEX IF NOT EXISTS idx_listings_bitmap_number ON listings(bitmap_number);
     CREATE INDEX IF NOT EXISTS idx_transactions_listing_id ON transactions(listing_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
     CREATE INDEX IF NOT EXISTS idx_transactions_idempotency_key ON transactions(idempotency_key);
@@ -89,5 +108,10 @@ export function closeDb(): void {
     db.close();
     db = null;
     logger.info('Database connection closed');
+  }
+  if (blocksDb) {
+    blocksDb.close();
+    blocksDb = null;
+    logger.info('Blocks database connection closed');
   }
 }

@@ -15,6 +15,10 @@ interface ListingRow {
   sold_at: number | null;
   image_url: string;
   is_active: number;
+  bitmap_number: number | null;
+  inscription_number: number | null;
+  bitmap_hash: string | null;
+  owner_address: string | null;
 }
 
 function rowToListing(row: ListingRow): BitmapListing {
@@ -30,6 +34,10 @@ function rowToListing(row: ListingRow): BitmapListing {
     soldAt: row.sold_at,
     imageUrl: row.image_url,
     isActive: row.is_active === 1,
+    bitmapNumber: row.bitmap_number || undefined,
+    inscriptionNumber: row.inscription_number || undefined,
+    bitmapHash: row.bitmap_hash || undefined,
+    ownerAddress: row.owner_address || undefined,
   };
 }
 
@@ -40,8 +48,8 @@ export class ListingRepository {
     const now = Date.now();
 
     const stmt = db.prepare(`
-      INSERT INTO listings (id, inscription_id, name, description, price, seller_address, listed_at, image_url, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+      INSERT INTO listings (id, inscription_id, name, description, price, seller_address, listed_at, image_url, is_active, bitmap_number, inscription_number, bitmap_hash, owner_address)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -52,7 +60,11 @@ export class ListingRepository {
       data.price,
       data.sellerAddress,
       now,
-      data.imageUrl
+      data.imageUrl,
+      data.bitmapNumber || null,
+      data.inscriptionNumber || null,
+      data.bitmapHash || null,
+      data.ownerAddress || null
     );
 
     return this.findById(id)!;
@@ -138,5 +150,15 @@ export class ListingRepository {
   delete(id: string): void {
     const db = getDb();
     db.prepare('DELETE FROM listings WHERE id = ?').run(id);
+  }
+
+  findSoldSince(sinceTimestamp: number): BitmapListing[] {
+    const db = getDb();
+    const rows = db.prepare(`
+      SELECT * FROM listings 
+      WHERE sold_at IS NOT NULL AND sold_at > ?
+      ORDER BY sold_at DESC
+    `).all(sinceTimestamp) as ListingRow[];
+    return rows.map(rowToListing);
   }
 }

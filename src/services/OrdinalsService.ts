@@ -5,6 +5,14 @@ import { logger } from '../utils/logger';
 import { OrdinalsInscription, BitmapVerification } from '../types/bitmap';
 import { ExternalApiError } from '../errors/AppError';
 
+export interface BitmapDetails {
+  bitmapNumber?: number;
+  inscriptionNumber: number;
+  ownerAddress: string;
+  contentType: string;
+  body: string;
+}
+
 export class OrdinalsService {
   private baseUrl = config.apis.ordinals.baseUrl;
   private timeout = config.apis.ordinals.timeout;
@@ -70,13 +78,54 @@ export class OrdinalsService {
         this.timeout,
         'Ordinals API get inscription'
       );
-
       return response;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         return null;
       }
       throw error;
+    }
+  }
+
+  async getInscriptionsByAddress(address: string): Promise<any[]> {
+    logger.info('Fetching inscriptions by address from Ordinals API', { address });
+    
+    try {
+      const response = await withTimeout<any>(
+        axios.get(
+          `${this.baseUrl}/inscriptions`,
+          {
+            params: { address },
+            timeout: this.timeout,
+            headers: { 'Accept': 'application/json' }
+          }
+        ).then(res => res.data),
+        this.timeout,
+        'Ordinals API get inscriptions by address'
+      );
+      
+      return response.inscriptions || [];
+    } catch (error) {
+      logger.error('Error fetching inscriptions by address', { address, error });
+      return [];
+    }
+  }
+
+  async getBitmapDetails(inscriptionId: string): Promise<BitmapDetails | null> {
+    try {
+      const inscription = await this.getInscription(inscriptionId);
+      if (!inscription) return null;
+
+      return {
+        bitmapNumber: inscription.number,
+        inscriptionNumber: inscription.number,
+        ownerAddress: inscription.address,
+        contentType: inscription.content_type,
+        body: inscription.body
+      };
+    } catch (error) {
+      logger.error('Error getting bitmap details', { inscriptionId, error });
+      return null;
     }
   }
 }

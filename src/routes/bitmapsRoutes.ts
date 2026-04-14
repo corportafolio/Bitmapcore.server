@@ -16,6 +16,23 @@ router.get('/', async (req: Request, res: Response) => {
   sendSuccess(res, result);
 });
 
+router.get('/active', async (_req: Request, res: Response) => {
+  const listings = await bitmapService.getActiveListings();
+  sendSuccess(res, listings);
+});
+
+router.get('/sold', async (req: Request, res: Response) => {
+  const since = parseInt(req.query.since as string) || 0;
+  const listings = await bitmapService.getSoldListingsSince(since);
+  sendSuccess(res, listings);
+});
+
+router.get('/owner/:address', async (req: Request, res: Response) => {
+  const { address } = req.params;
+  const inscriptions = await bitmapService.getInscriptionsByOwner(address);
+  sendSuccess(res, inscriptions);
+});
+
 router.get('/:id', validateUUID('id'), async (req: Request, res: Response) => {
   const listing = await bitmapService.getListingById(req.params.id);
   sendSuccess(res, listing);

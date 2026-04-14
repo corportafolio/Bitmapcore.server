@@ -1,5 +1,6 @@
 import { ListingRepository } from '../repositories/ListingRepository';
 import { OrdinalsService } from './OrdinalsService';
+import { MempoolService } from './MempoolService';
 import { BitmapListing, BitmapListingCreate, BitmapListingUpdate, BitmapVerification } from '../types/bitmap';
 import { NotFoundError, ValidationError } from '../errors/AppError';
 import { isValidBitcoinAddress } from '../utils/bitcoinValidator';
@@ -8,10 +9,12 @@ import { logger } from '../utils/logger';
 export class BitmapService {
   private listingRepo: ListingRepository;
   private ordinalsService: OrdinalsService;
+  private mempoolService: MempoolService;
 
   constructor() {
     this.listingRepo = new ListingRepository();
     this.ordinalsService = new OrdinalsService();
+    this.mempoolService = new MempoolService();
   }
 
   async createListing(data: BitmapListingCreate): Promise<BitmapListing> {
@@ -31,7 +34,18 @@ export class BitmapService {
       throw new ValidationError('This inscription is not a valid Bitmap');
     }
 
-    const listing = this.listingRepo.create(data);
+    const bitmapDetails = await this.ordinalsService.getBitmapDetails(data.inscriptionId);
+    const bitmapHash = await this.mempoolService.getInscriptionHash(data.inscriptionId);
+
+    const listingData: BitmapListingCreate = {
+      ...data,
+      bitmapNumber: bitmapDetails?.bitmapNumber || data.bitmapNumber,
+      inscriptionNumber: bitmapDetails?.inscriptionNumber || data.inscriptionNumber,
+      ownerAddress: bitmapDetails?.ownerAddress || data.ownerAddress,
+      bitmapHash: bitmapHash || data.bitmapHash,
+    };
+
+    const listing = this.listingRepo.create(listingData);
 
     logger.info('Listing created', { listingId: listing.id, inscriptionId: data.inscriptionId });
 
@@ -41,6 +55,16 @@ export class BitmapService {
   async getListings(page: number = 1, limit: number = 20): Promise<{ items: BitmapListing[]; total: number }> {
     logger.debug('Getting listings', { page, limit });
     return this.listingRepo.findActiveWithPagination(page, limit);
+  }
+
+  async getActiveListings(): Promise<BitmapListing[]> {
+    logger.debug('Getting all active listings');
+    return this.listingRepo.findAllActive();
+  }
+
+  async getInscriptionsByOwner(address: string): Promise<any[]> {
+    logger.info('Getting inscriptions for owner', { address });
+    return this.ordinalsService.getInscriptionsByAddress(address);
   }
 
   async getListingById(id: string): Promise<BitmapListing> {
@@ -90,5 +114,10 @@ export class BitmapService {
 
   async verifyBitmap(inscriptionId: string): Promise<BitmapVerification> {
     return this.ordinalsService.verifyBitmap(inscriptionId);
+  }
+
+  async getSoldListingsSince(sinceTimestamp: number): Promise<BitmapListing[]> {
+    logger.debug('Getting sold listings since', { sinceTimestamp });
+    return this.listingRepo.findSoldSince(sinceTimestamp);
   }
 }
