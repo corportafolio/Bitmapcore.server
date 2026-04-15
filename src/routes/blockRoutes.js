@@ -27,7 +27,16 @@ router.get('/:blockNumber', async (req: { params: BlockParams }, res: Response) 
     const row = stmt.get(blockNumberStr) as { bloque: number; mempool: string } | undefined;
 
     if (!row) {
-      return sendError(res, 'Block not found', 404);
+      // Bloque fuera del rango válido (0-480000) - el servidor responde pero no hay datos
+      return sendSuccess(res, {
+        blockNumber: blockNumber,
+        message: "No hay datos para este bloque",
+        totalTransactions: 0,
+        transactions: [],
+        totalBtc: 0,
+        totalFee: 0,
+        totalWeight: 0
+      }, 202);
     }
 
     const mempool = row.mempool;

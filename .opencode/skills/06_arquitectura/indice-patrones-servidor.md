@@ -172,12 +172,25 @@ Los patrones de esta skill **DEBEN** alinearse con los documentos en /docs:
 
 ---
 
-## Documentos Relacionados (Nivel Superior)
+## 7. Coordinación con la Aplicación (BitmapCorpApp)
+
+La arquitectura del servidor no está aislada; es un espejo y soporte de los patrones definidos en la aplicación Android.
+
+### Relación con Grupos de Patrones
+
+| Grupo | Skill de la App | Relación con el Servidor |
+|-------|-----------------|--------------------------|
+| **Grupo 1** | **Skill 3** (Arquitectura General) | Implementación de flujos de datos asíncronos y gestión centralizada de caché compatible con `StateFlow`. |
+| **Grupo 2** | **Skill 19** (Architecture Local Marketplace) | Validación de reglas de negocio, persistencia de transacciones e integridad de los `listings` locales. |
+
+Cualquier cambio en la estructura de las tablas documentadas en el **Documento 07** o en las responsabilidades de la **Skill 07** debe ser coordinado con estas skills de la aplicación para evitar rupturas de contrato en la comunicación.
+
+---
+
+## 8. Documentos Relacionados Actualizados
 
 | Documento | Descripción |
 |-----------|-------------|
-| Server 01: Server-Endpoints | Define los 7 endpoints del servidor |
-| Server 02: Server-Security | Reglas de seguridad obligatorias |
-| Server 03: Server-Bitcoin-Integration | Integración con APIs de Bitcoin |
-| Server 04: Server-Transactions | Gestión de transacciones |
-| Server 05: Server-Listings | Gestión de listados |
+| Server 01: Endpoints | Definición de APIs |
+| Server 06: Servidor Perpetuo | Gestión de procesos con PM2 |
+| Server 07: Tablas Marketplace | Estructura de BD y Mempool |

@@ -1,12 +1,6 @@
 # 03 - Bitcoin Integration
 
-## Prólogo
-
-Este documento pertenece a **BitmapCorpServer**. Las reglas de negocio aquí documentadas están **POR ENCIMA DEL CÓDIGO** y **POR ENCIMA DE LAS SKILLS**.
-
-**Skills relacionadas:**
-- Skill 04: Bitcoin Integration
-- Skill 05: Transactions
+---
 
 ---
 
@@ -184,7 +178,19 @@ GET https://mempool.space/api/tx/abc123...
 
 ---
 
-## 5. Skills Relacionadas
+## 5. Base de Datos de Bloques (Caché local)
+
+Para evitar la dependencia absoluta de APIs externas, el servidor mantiene una base de datos local de la mempool (`btc_bloques.db`).
+
+### Tabla: bloques
+- **bloque (PK):** Número de bloque.
+- **mempool:** Datos JSON con transacciones y hashes de bitmaps.
+
+This function is essential for the `BitmapCorpApp` app to obtain the `bitmapHash` instantly without suffering rate limiting from external servers.
+
+---
+
+## 6. Skills Relacionadas
 
 - Server-S4: Server-Bitcoin-Integration
 - Server-S5: Server-Transactions

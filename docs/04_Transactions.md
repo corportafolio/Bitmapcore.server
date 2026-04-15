@@ -1,12 +1,5 @@
 # 04 - Transactions
 
-## Prólogo
-
-Este documento pertenece a **BitmapCorpServer**. Las reglas de negocio aquí documentadas están **POR ENCIMA DEL CÓDIGO** y **POR ENCIMA DE LAS SKILLS**.
-
-**Skills relacionadas:**
-- Skill 05: Transactions
-
 ---
 
 ## 1. Propósito del documento
