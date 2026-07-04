@@ -8,9 +8,32 @@ Este documento define las reglas y el sistema para asegurar que el servidor de B
 
 ---
 
-## 2. Sistema de Gestión: PM2
+## 2. Script de Gestión del Servidor
 
-Para garantizar la disponibilidad continua, el servidor utiliza **PM2** en lugar de procesos simples.
+El servidor usa un script de shell para mantenerlo corriendo perpetuamente:
+
+### Script Principal
+**Ubicación:** `/home/candela/scripts/start-bitmapcorp-server.sh`
+
+### Comandos disponibles:
+| Comando | Descripción |
+|---------|-------------|
+| `./start-bitmapcorp-server.sh start` | Iniciar el servidor |
+| `./start-bitmapcorp-server.sh stop` | Detener el servidor |
+| `./start-bitmapcorp-server.sh restart` | Reiniciar el servidor |
+| `./start-bitmapcorp-server.sh status` | Ver estado y logs |
+| `./start-bitmapcorp-server.sh autostart` | Configurar inicio automático al encender el PC |
+
+### Cómo funciona:
+1. El script usa `nohup` + `run-server.sh` (del servidor) para iniciar el proceso en background
+2. El script `run-server.sh` tiene un loop infinito que reinicia el servidor automáticamente si se cae
+3. El autostart se configura mediante un archivo `.desktop` en `~/.config/autostart/`
+
+---
+
+## 3. Sistema de Gestión (Alternativo - PM2)
+
+Para garantizar la disponibilidad continua, el servidor puede usar **PM2** en lugar de procesos simples.
 
 ### ¿Por qué PM2 y no otros?
 - **Resiliencia:** Reinicia automáticamente el servidor si este falla por un error inesperado (Zero-downtime).
