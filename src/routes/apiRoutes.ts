@@ -3,7 +3,7 @@ import { BitmapService } from '../services/BitmapService';
 import bitmapsRouter from './bitmapsRoutes';
 import walletRouter from './walletRoutes';
 import transactionRouter from './transactionRoutes';
-import blockRouter from './blockRoutes';
+// import blockRouter from './blockRoutes';
 import { sendSuccess } from '../utils/responseFormatter';
 
 const router: Router = Router();
@@ -35,6 +35,6 @@ router.get('/verify-bitmap/:id', async (req: Request, res: Response) => {
 router.use('/bitmaps', bitmapsRouter);
 router.use('/wallet', walletRouter);
 router.use('/transaction', transactionRouter);
-router.use('/block', blockRouter);
+// router.use('/block', blockRouter);
 
 export default router;
