@@ -19,6 +19,11 @@ interface ListingRow {
   inscription_number: number | null;
   bitmap_hash: string | null;
   owner_address: string | null;
+  seller_ordinal_public_key: string | null;
+  seller_payment_address: string | null;
+  unsigned_psbt: string | null;
+  signed_psbt: string | null;
+  psbt_status: string | null;
 }
 
 function rowToListing(row: ListingRow): BitmapListing {
@@ -38,6 +43,11 @@ function rowToListing(row: ListingRow): BitmapListing {
     inscriptionNumber: row.inscription_number || undefined,
     bitmapHash: row.bitmap_hash || undefined,
     ownerAddress: row.owner_address || undefined,
+    sellerOrdinalPublicKey: row.seller_ordinal_public_key || undefined,
+    sellerPaymentAddress: row.seller_payment_address || undefined,
+    unsignedPsbt: row.unsigned_psbt || undefined,
+    signedPsbt: row.signed_psbt || undefined,
+    psbtStatus: (row.psbt_status as 'created' | 'signed' | 'sold' | 'expired') || undefined,
   };
 }
 
@@ -48,8 +58,8 @@ export class ListingRepository {
     const now = Date.now();
 
     const stmt = db.prepare(`
-      INSERT INTO listings (id, inscription_id, name, description, price, seller_address, listed_at, image_url, is_active, bitmap_number, inscription_number, bitmap_hash, owner_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+      INSERT INTO listings (id, inscription_id, name, description, price, seller_address, listed_at, image_url, is_active, bitmap_number, inscription_number, bitmap_hash, owner_address, seller_ordinal_public_key, seller_payment_address)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -64,7 +74,9 @@ export class ListingRepository {
       data.bitmapNumber || null,
       data.inscriptionNumber || null,
       data.bitmapHash || null,
-      data.ownerAddress || null
+      data.ownerAddress || null,
+      data.sellerOrdinalPublicKey || null,
+      data.sellerPaymentAddress || null
     );
 
     return this.findById(id)!;
@@ -136,13 +148,37 @@ export class ListingRepository {
     return this.findById(id)!;
   }
 
+  updatePsbtFields(id: string, fields: { unsignedPsbt?: string; signedPsbt?: string; psbtStatus?: string }): void {
+    const db = getDb();
+    const updates: string[] = [];
+    const values: (string | number)[] = [];
+
+    if (fields.unsignedPsbt !== undefined) {
+      updates.push('unsigned_psbt = ?');
+      values.push(fields.unsignedPsbt);
+    }
+    if (fields.signedPsbt !== undefined) {
+      updates.push('signed_psbt = ?');
+      values.push(fields.signedPsbt);
+    }
+    if (fields.psbtStatus !== undefined) {
+      updates.push('psbt_status = ?');
+      values.push(fields.psbtStatus);
+    }
+
+    if (updates.length === 0) return;
+
+    values.push(id);
+    db.prepare(`UPDATE listings SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  }
+
   markAsSold(id: string, buyerAddress: string): void {
     const db = getDb();
     const now = Date.now();
 
     db.prepare(`
       UPDATE listings 
-      SET is_active = 0, buyer_address = ?, sold_at = ?
+      SET is_active = 0, buyer_address = ?, sold_at = ?, psbt_status = 'sold'
       WHERE id = ?
     `).run(buyerAddress, now, id);
   }

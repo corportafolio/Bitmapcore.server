@@ -27,4 +27,16 @@ router.get('/:txid/status', validateUUID('txid'), async (req: Request, res: Resp
   sendSuccess(res, result);
 });
 
+router.get('/wallet/:address/balance', async (req: Request, res: Response) => {
+  const { address } = req.params;
+  const result = await transactionService.getBalance(address);
+  sendSuccess(res, result);
+});
+
+router.get('/wallet/:address/utxos', async (req: Request, res: Response) => {
+  const { address } = req.params;
+  const result = await transactionService.getUTXOs(address);
+  sendSuccess(res, result);
+});
+
 export default router;

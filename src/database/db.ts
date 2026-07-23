@@ -65,7 +65,12 @@ function runMigrations(database: Database.Database): void {
       bitmap_number INTEGER,
       inscription_number INTEGER,
       bitmap_hash TEXT,
-      owner_address TEXT
+      owner_address TEXT,
+      seller_ordinal_public_key TEXT,
+      seller_payment_address TEXT,
+      unsigned_psbt TEXT,
+      signed_psbt TEXT,
+      psbt_status TEXT DEFAULT 'created'
     );
 
     CREATE TABLE IF NOT EXISTS transactions (
@@ -94,13 +99,36 @@ function runMigrations(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_listings_is_active ON listings(is_active);
     CREATE INDEX IF NOT EXISTS idx_listings_inscription_id ON listings(inscription_id);
     CREATE INDEX IF NOT EXISTS idx_listings_bitmap_number ON listings(bitmap_number);
+    CREATE INDEX IF NOT EXISTS idx_listings_psbt_status ON listings(psbt_status);
     CREATE INDEX IF NOT EXISTS idx_transactions_listing_id ON transactions(listing_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
     CREATE INDEX IF NOT EXISTS idx_transactions_idempotency_key ON transactions(idempotency_key);
     CREATE INDEX IF NOT EXISTS idx_idempotency_expires ON idempotency_keys(expires_at);
   `);
 
+  runPsbtMigrations(database);
+
   logger.info('Database migrations completed');
+}
+
+function runPsbtMigrations(database: Database.Database): void {
+  const columns = database.pragma('table_info(listings)') as Array<{ name: string }>;
+  const columnNames = columns.map(c => c.name);
+
+  const psbtColumns = [
+    { name: 'seller_ordinal_public_key', type: 'TEXT' },
+    { name: 'seller_payment_address', type: 'TEXT' },
+    { name: 'unsigned_psbt', type: 'TEXT' },
+    { name: 'signed_psbt', type: 'TEXT' },
+    { name: 'psbt_status', type: "TEXT DEFAULT 'created'" },
+  ];
+
+  for (const col of psbtColumns) {
+    if (!columnNames.includes(col.name)) {
+      logger.info('Adding PSBT column to listings', { column: col.name });
+      database.exec(`ALTER TABLE listings ADD COLUMN ${col.name} ${col.type}`);
+    }
+  }
 }
 
 export function closeDb(): void {

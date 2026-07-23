@@ -15,6 +15,12 @@ export interface BitmapListing {
   inscriptionNumber?: number;
   bitmapHash?: string;
   ownerAddress?: string;
+  // PSBT fields for trustless trading
+  sellerOrdinalPublicKey?: string;
+  sellerPaymentAddress?: string;
+  unsignedPsbt?: string;
+  signedPsbt?: string;
+  psbtStatus?: 'created' | 'signed' | 'sold' | 'expired';
 }
 
 export interface BitmapListingCreate {
@@ -28,6 +34,9 @@ export interface BitmapListingCreate {
   inscriptionNumber?: number;
   bitmapHash?: string;
   ownerAddress?: string;
+  // PSBT fields
+  sellerOrdinalPublicKey: string;
+  sellerPaymentAddress: string;
 }
 
 export interface BitmapListingUpdate {
@@ -46,4 +55,6 @@ export interface OrdinalsInscription {
   address: string;
   content_type: string;
   body: string;
+  output?: string;  // txid:vout
+  value?: number;   // satoshis
 }

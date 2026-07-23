@@ -13,12 +13,15 @@
   "dependencies": {
     "@types/helmet": "^4.0.0",
     "axios": "^1.6.2",
-    "better-sqlite3": "^9.2.2",
+    "better-sqlite3": "^11.10.0",
+    "bitcoinjs-lib": "^7.0.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
+    "ecpair": "^3.0.1",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.2.0",
+    "tiny-secp256k1": "^2.2.4",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
     "zod": "^3.22.4"

@@ -24,6 +24,17 @@ interface MempoolTransaction {
   };
 }
 
+interface MempoolUTXO {
+  txid: string;
+  vout: number;
+  value: number;
+  status: {
+    confirmed: boolean;
+    block_height?: number;
+    block_time?: number;
+  };
+}
+
 export class MempoolService {
   private baseUrl = config.apis.mempool.baseUrl;
   private timeout = config.apis.mempool.timeout;
@@ -63,6 +74,41 @@ export class MempoolService {
           message: error.message
         });
         throw new ExternalApiError(`Failed to get balance: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async getUTXOs(address: string): Promise<MempoolUTXO[]> {
+    logger.info('Getting wallet UTXOs', { address });
+
+    try {
+      const response = await withTimeout<MempoolUTXO[]>(
+        axios.get<MempoolUTXO[]>(
+          `${this.baseUrl}/address/${address}/utxo`,
+          { timeout: this.timeout }
+        ).then(res => res.data),
+        this.timeout,
+        'Mempool API get UTXOs'
+      );
+
+      const confirmedUtxos = response.filter(utxo => utxo.status.confirmed);
+
+      logger.info('Wallet UTXOs retrieved', { 
+        address, 
+        total: response.length,
+        confirmed: confirmedUtxos.length 
+      });
+
+      return confirmedUtxos;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Mempool UTXOs error', {
+          address,
+          status: error.response?.status,
+          message: error.message
+        });
+        throw new ExternalApiError(`Failed to get UTXOs: ${error.message}`);
       }
       throw error;
     }

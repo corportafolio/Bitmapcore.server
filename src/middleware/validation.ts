@@ -50,6 +50,8 @@ export const createListingSchema = z.object({
   inscriptionId: z.string().min(10),
   price: z.number().positive(),
   sellerAddress: z.string().min(26).max(62),
+  sellerOrdinalPublicKey: z.string().min(66).max(130),
+  sellerPaymentAddress: z.string().min(26).max(62),
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   imageUrl: z.string().url(),
@@ -57,4 +59,9 @@ export const createListingSchema = z.object({
 
 export const updateListingSchema = z.object({
   price: z.number().positive().optional(),
+});
+
+export const signListingSchema = z.object({
+  signedPsbt: z.string().min(20),
+  sellerOrdinalPublicKey: z.string().min(66).max(130),
 });

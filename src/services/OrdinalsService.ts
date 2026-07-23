@@ -38,7 +38,8 @@ export class OrdinalsService {
       logger.info('Bitmap verification result', {
         inscriptionId,
         isBitmap,
-        blockNumber: response.number
+        blockNumber: response.number,
+        ownerAddress: response.address
       });
 
       return {
@@ -93,9 +94,8 @@ export class OrdinalsService {
     try {
       const response = await withTimeout<any>(
         axios.get(
-          `${this.baseUrl}/inscriptions`,
+          `${this.baseUrl}/address/${address}/inscriptions`,
           {
-            params: { address },
             timeout: this.timeout,
             headers: { 'Accept': 'application/json' }
           }
@@ -126,6 +126,32 @@ export class OrdinalsService {
     } catch (error) {
       logger.error('Error getting bitmap details', { inscriptionId, error });
       return null;
+    }
+  }
+
+  async verifyOwnership(inscriptionId: string, expectedAddress: string): Promise<boolean> {
+    logger.info('Verifying ownership', { inscriptionId, expectedAddress });
+    
+    try {
+      const inscription = await this.getInscription(inscriptionId);
+      if (!inscription) {
+        logger.warn('Inscription not found for ownership verification', { inscriptionId });
+        return false;
+      }
+
+      const isOwner = inscription.address.toLowerCase() === expectedAddress.toLowerCase();
+      
+      logger.info('Ownership verification result', {
+        inscriptionId,
+        expectedAddress,
+        actualOwner: inscription.address,
+        isOwner
+      });
+
+      return isOwner;
+    } catch (error) {
+      logger.error('Error verifying ownership', { inscriptionId, expectedAddress, error });
+      return false;
     }
   }
 }

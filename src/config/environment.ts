@@ -13,13 +13,18 @@ export const config = {
 
   apis: {
     ordinals: {
-      baseUrl: process.env.ORDINALS_API_URL || 'https://api.ordinals.com',
+      baseUrl: process.env.ORDINALS_API_URL || 'https://ordinals.com/r',
       timeout: parseInt(process.env.ORDINALS_TIMEOUT || '10000', 10),
     },
     mempool: {
       baseUrl: process.env.MEMPOOL_API_URL || 'https://mempool.space/api',
       timeout: parseInt(process.env.MEMPOOL_TIMEOUT || '10000', 10),
     },
+  },
+
+  marketplace: {
+    feePercent: parseFloat(process.env.MARKETPLACE_FEE_PERCENT || '1.0'),
+    feeAddress: process.env.MARKETPLACE_FEE_ADDRESS || '',
   },
 
   rateLimit: {

@@ -3,6 +3,7 @@ import { TransactionRepository } from '../repositories/TransactionRepository';
 import { IdempotencyRepository } from '../repositories/IdempotencyRepository';
 import { ListingRepository } from '../repositories/ListingRepository';
 import { MempoolService } from './MempoolService';
+import { PSBTService } from './PSBTService';
 import { PSBTCreate, TransactionStatusResponse } from '../types/transaction';
 import { config } from '../config/environment';
 import { logger } from '../utils/logger';
@@ -14,12 +15,14 @@ export class TransactionService {
   private idempotencyRepo: IdempotencyRepository;
   private listingRepo: ListingRepository;
   private mempoolService: MempoolService;
+  private psbtService: PSBTService;
 
   constructor() {
     this.transactionRepo = new TransactionRepository();
     this.idempotencyRepo = new IdempotencyRepository();
     this.listingRepo = new ListingRepository();
     this.mempoolService = new MempoolService();
+    this.psbtService = new PSBTService();
   }
 
   async createPSBT(
@@ -27,7 +30,7 @@ export class TransactionService {
     buyerAddress: string,
     idempotencyKey: string
   ): Promise<PSBTCreate> {
-    logger.info('Creating PSBT', { bitmapId, buyerAddress, idempotencyKey });
+    logger.info('Creating purchase PSBT', { bitmapId, buyerAddress, idempotencyKey });
 
     if (!isValidBitcoinAddress(buyerAddress)) {
       throw new ValidationError('Invalid buyer Bitcoin address');
@@ -48,12 +51,25 @@ export class TransactionService {
       throw new ValidationError('Bitmap is not for sale');
     }
 
-    const psbt = this.generateMockPSBT(buyerAddress, listing.sellerAddress, listing.price);
-    const transactionId = uuidv4();
-    const expiresAt = Date.now() + config.transaction.psbtExpirationMs;
+    if (listing.psbtStatus !== 'signed' || !listing.signedPsbt) {
+      throw new ValidationError('Listing is not ready for purchase (PSBT not signed)');
+    }
+
+    const buyerUtxos = await this.mempoolService.getUTXOs(buyerAddress);
+    
+    const completedResult = await this.psbtService.completePurchasePSBT(
+      listing.signedPsbt,
+      buyerAddress,
+      listing.price,
+      buyerUtxos,
+      listing.sellerPaymentAddress!
+    );
+
+    const transactionId = completedResult.transactionId;
+    const expiresAt = completedResult.expiresAt;
 
     const result: PSBTCreate = {
-      psbt,
+      psbt: completedResult.psbt,
       transactionId,
       expiresAt,
     };
@@ -66,11 +82,17 @@ export class TransactionService {
       idempotencyKey,
     });
 
-    this.transactionRepo.updatePsbt(transactionId, psbt);
+    this.transactionRepo.updatePsbt(transactionId, completedResult.psbt);
 
     this.idempotencyRepo.save(idempotencyKey, result);
 
-    logger.info('PSBT created', { transactionId, expiresAt });
+    logger.info('Purchase PSBT created', { 
+      transactionId, 
+      expiresAt,
+      buyerInputs: completedResult.buyerInputs.length,
+      marketplaceFee: completedResult.marketplaceFee,
+      changeValue: completedResult.changeValue
+    });
 
     return result;
   }
@@ -93,14 +115,14 @@ export class TransactionService {
     let lastError: Error | null = null;
     for (let attempt = 1; attempt <= config.transaction.maxRetryAttempts; attempt++) {
       try {
-        const result = await this.mempoolService.broadcast(signedPsbt);
+        const rawTx = await this.psbtService.finalizeAndBroadcast(signedPsbt);
         
-        this.transactionRepo.updateStatus(transactionId, 'BROADCASTED', result.txid);
+        this.transactionRepo.updateStatus(transactionId, 'BROADCASTED', rawTx);
         this.listingRepo.markAsSold(transaction.listingId, transaction.buyerAddress);
 
-        logger.info('Transaction broadcasted successfully', { transactionId, txid: result.txid });
+        logger.info('Transaction broadcasted successfully', { transactionId, txid: rawTx });
 
-        return { txid: result.txid, status: 'broadcasted' };
+        return { txid: rawTx, status: 'broadcasted' };
       } catch (error) {
         lastError = error as Error;
         logger.warn(`Broadcast attempt ${attempt} failed`, {
@@ -132,9 +154,11 @@ export class TransactionService {
     return this.mempoolService.getBalance(address);
   }
 
-  private generateMockPSBT(buyerAddress: string, sellerAddress: string, price: number): string {
-    const mockPsbt = `cHNidP8BAP0A${Buffer.from(JSON.stringify({ buyer: buyerAddress, seller: sellerAddress, price })).toString('base64')}`;
-    return mockPsbt;
+  async getUTXOs(address: string): Promise<any[]> {
+    if (!isValidBitcoinAddress(address)) {
+      throw new ValidationError('Invalid Bitcoin address');
+    }
+    return this.mempoolService.getUTXOs(address);
   }
 
   private delay(ms: number): Promise<void> {

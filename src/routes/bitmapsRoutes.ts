@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { BitmapService } from '../services/BitmapService';
-import { validateBody, createListingSchema, updateListingSchema, validateUUID } from '../middleware/validation';
+import { BitmapService, CreateListingResult } from '../services/BitmapService';
+import { validateBody, createListingSchema, updateListingSchema, validateUUID, signListingSchema } from '../middleware/validation';
 import { sendSuccess, sendNotFound } from '../utils/responseFormatter';
 import { BitmapListingCreate, BitmapListingUpdate } from '../types/bitmap';
 
@@ -40,8 +40,14 @@ router.get('/:id', validateUUID('id'), async (req: Request, res: Response) => {
 
 router.post('/', validateBody(createListingSchema), async (req: Request, res: Response) => {
   const data: BitmapListingCreate = req.body;
-  const listing = await bitmapService.createListing(data);
-  sendSuccess(res, listing, 201);
+  const result: CreateListingResult = await bitmapService.createListing(data);
+  sendSuccess(res, result, 201);
+});
+
+router.post('/:id/sign', validateUUID('id'), validateBody(signListingSchema), async (req: Request, res: Response) => {
+  const { signedPsbt, sellerOrdinalPublicKey } = req.body;
+  const listing = await bitmapService.signListing(req.params.id, signedPsbt, sellerOrdinalPublicKey);
+  sendSuccess(res, listing);
 });
 
 router.put('/:id', validateUUID('id'), validateBody(updateListingSchema), async (req: Request, res: Response) => {

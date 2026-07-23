@@ -9,3 +9,6 @@ coverage/
 .idea/
 *.swp
 *.swo
+docs/
+.opencode/
+rules/
