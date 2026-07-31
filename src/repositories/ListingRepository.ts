@@ -104,6 +104,31 @@ export class ListingRepository {
     return rows.map(rowToListing);
   }
 
+  findActiveWithPaginationAndSort(page: number, limit: number, sort: string): { items: BitmapListing[]; total: number; floorPrice: number } {
+    const db = getDb();
+    const offset = (page - 1) * limit;
+
+    let orderClause = 'ORDER BY listed_at DESC';
+    if (sort === 'price_asc') orderClause = 'ORDER BY price ASC';
+    else if (sort === 'price_desc') orderClause = 'ORDER BY price DESC';
+    else if (sort === 'listed_desc') orderClause = 'ORDER BY listed_at DESC';
+
+    const countResult = db.prepare('SELECT COUNT(*) as total FROM listings WHERE is_active = 1').get() as { total: number };
+    const floorResult = db.prepare('SELECT COALESCE(MIN(price), 0) as floorPrice FROM listings WHERE is_active = 1 AND price > 0').get() as { floorPrice: number };
+    const rows = db.prepare(`
+      SELECT * FROM listings 
+      WHERE is_active = 1 
+      ${orderClause}
+      LIMIT ? OFFSET ?
+    `).all(limit, offset) as ListingRow[];
+
+    return {
+      items: rows.map(rowToListing),
+      total: countResult.total,
+      floorPrice: floorResult.floorPrice,
+    };
+  }
+
   findActiveWithPagination(page: number, limit: number): { items: BitmapListing[]; total: number } {
     const db = getDb();
     const offset = (page - 1) * limit;

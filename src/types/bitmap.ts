@@ -49,6 +49,15 @@ export interface BitmapVerification {
   inscriptionId: string;
 }
 
+export interface ListingsResponse {
+  items: BitmapListing[];
+  total: number;
+  floorPrice: number;
+  page: number;
+  limit: number;
+  sort: string;
+}
+
 export interface OrdinalsInscription {
   id: string;
   number: number;

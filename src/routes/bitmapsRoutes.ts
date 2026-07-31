@@ -10,8 +10,9 @@ const bitmapService = new BitmapService();
 router.get('/', async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 20;
+  const sort = (req.query.sort as string) || 'listed_desc';
 
-  const result = await bitmapService.getListings(page, limit);
+  const result = await bitmapService.getListings(page, limit, sort);
 
   sendSuccess(res, result);
 });

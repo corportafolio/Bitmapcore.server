@@ -17,7 +17,7 @@ En este proyecto, se respeta estrictamente la siguiente jerarquía:
 
 ---
 
-## 2. Documentos del Sistema (docs/) - 8 Documentos
+## 2. Documentos del Sistema (docs/) - 9 Documentos
 
 | # | Documento | Propósito |
 |---|-----------|-----------|
@@ -29,6 +29,7 @@ En este proyecto, se respeta estrictamente la siguiente jerarquía:
 | 05 | [Listados](file:///home/candela/BitmapCorpServer/docs/05_Listings.md) | Gestión del Marketplace Local. |
 | 06 | [Servidor Perpetuo](file:///home/candela/BitmapCorpServer/docs/06_Servidor-Perpetuo.md) | Gestión con PM2. |
 | 07 | [2 tablas, la tabla 1 el local marketplace y la tabla 2 datos de la mempoll](file:///home/candela/BitmapCorpServer/docs/07_2-tablas-local-marketplace-y-datos-mempool.md) | Estructura de datos crítica. |
+| 50 | [Sistema de Comercio de Activos (Bitmap)](file:///home/candela/BitmapCorpServer/docs/50_Trading-System.md) | Verificación de inscripción, ownership, parseo JSON, flujo compra/venta. |
 
 ---
 

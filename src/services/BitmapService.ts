@@ -2,7 +2,7 @@ import { ListingRepository } from '../repositories/ListingRepository';
 import { OrdinalsService } from './OrdinalsService';
 import { MempoolService } from './MempoolService';
 import { PSBTService } from './PSBTService';
-import { BitmapListing, BitmapListingCreate, BitmapListingUpdate, BitmapVerification } from '../types/bitmap';
+import { BitmapListing, BitmapListingCreate, BitmapListingUpdate, BitmapVerification, ListingsResponse } from '../types/bitmap';
 import { NotFoundError, ValidationError } from '../errors/AppError';
 import { isValidBitcoinAddress } from '../utils/bitcoinValidator';
 import { logger } from '../utils/logger';
@@ -122,9 +122,17 @@ export class BitmapService {
     return this.listingRepo.findById(listingId)!;
   }
 
-  async getListings(page: number = 1, limit: number = 20): Promise<{ items: BitmapListing[]; total: number }> {
-    logger.debug('Getting listings', { page, limit });
-    return this.listingRepo.findActiveWithPagination(page, limit);
+  async getListings(page: number = 1, limit: number = 20, sort: string = 'listed_desc'): Promise<ListingsResponse> {
+    logger.debug('Getting listings', { page, limit, sort });
+    const result = this.listingRepo.findActiveWithPaginationAndSort(page, limit, sort);
+    return {
+      items: result.items,
+      total: result.total,
+      floorPrice: result.floorPrice,
+      page,
+      limit,
+      sort,
+    };
   }
 
   async getActiveListings(): Promise<BitmapListing[]> {
