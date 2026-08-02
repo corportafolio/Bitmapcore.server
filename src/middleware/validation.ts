@@ -54,7 +54,7 @@ export const createListingSchema = z.object({
   sellerPaymentAddress: z.string().min(26).max(62),
   name: z.string().min(1).max(255),
   description: z.string().optional(),
-  imageUrl: z.string().url(),
+  imageUrl: z.string().url().or(z.literal('')),
 });
 
 export const updateListingSchema = z.object({
