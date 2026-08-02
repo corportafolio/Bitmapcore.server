@@ -5,6 +5,7 @@ import { config } from '../config/environment';
 import { logger } from '../utils/logger';
 import { ExternalApiError, ValidationError } from '../errors/AppError';
 
+bitcoin.initEccLib(tinysecp);
 const ECPair = ecpair.ECPairFactory(tinysecp);
 
 const NETWORK = bitcoin.networks.bitcoin;

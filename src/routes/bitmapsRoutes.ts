@@ -39,10 +39,14 @@ router.get('/:id', validateUUID('id'), async (req: Request, res: Response) => {
   sendSuccess(res, listing);
 });
 
-router.post('/', validateBody(createListingSchema), async (req: Request, res: Response) => {
-  const data: BitmapListingCreate = req.body;
-  const result: CreateListingResult = await bitmapService.createListing(data);
-  sendSuccess(res, result, 201);
+router.post('/', validateBody(createListingSchema), async (req: Request, res: Response, next) => {
+  try {
+    const data: BitmapListingCreate = req.body;
+    const result: CreateListingResult = await bitmapService.createListing(data);
+    sendSuccess(res, result, 201);
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post('/:id/sign', validateUUID('id'), validateBody(signListingSchema), async (req: Request, res: Response) => {
