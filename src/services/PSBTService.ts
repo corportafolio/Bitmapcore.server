@@ -16,6 +16,8 @@ export interface InscriptionUTXO {
   vout: number;
   value: number;
   satpoint: string;
+  contentType: string;
+  height: number;
 }
 
 export interface ListingPSBTData {
@@ -267,6 +269,8 @@ export class PSBTService {
         vout: parseInt(outputParts[1], 10),
         value: data.value || 0,
         satpoint: data.satpoint || '',
+        contentType: data.content_type || '',
+        height: data.height || 0,
       };
     } catch (error) {
       logger.error('Error fetching inscription UTXO', { inscriptionId, error });

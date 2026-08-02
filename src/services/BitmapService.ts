@@ -41,35 +41,25 @@ export class BitmapService {
       throw new ValidationError('Bitmap is already listed for sale');
     }
 
-    const verification = await this.ordinalsService.verifyBitmap(data.inscriptionId);
-    if (!verification.isBitmap) {
-      throw new ValidationError('This inscription is not a valid Bitmap');
-    }
-
-    const isOwner = await this.ordinalsService.verifyOwnership(data.inscriptionId, data.sellerAddress);
-    if (!isOwner) {
-      throw new ValidationError('You are not the owner of this Bitmap. Only the owner can list it for sale.');
-    }
-
-    const bitmapDetails = await this.ordinalsService.getBitmapDetails(data.inscriptionId);
-    const bitmapHash = await this.mempoolService.getInscriptionHash(data.inscriptionId);
-
-    const listingData: BitmapListingCreate = {
-      ...data,
-      bitmapNumber: bitmapDetails?.bitmapNumber || data.bitmapNumber,
-      inscriptionNumber: bitmapDetails?.inscriptionNumber || data.inscriptionNumber,
-      ownerAddress: bitmapDetails?.ownerAddress || data.ownerAddress,
-      bitmapHash: bitmapHash || data.bitmapHash,
-    };
-
-    const listing = this.listingRepo.create(listingData);
-
     const psbtResult = await this.psbtService.createListingPSBT(
       data.inscriptionId,
       data.sellerPaymentAddress,
       data.price,
       data.sellerOrdinalPublicKey
     );
+
+    const utxo = psbtResult.inscriptionUtxo;
+
+    if (utxo.contentType !== 'text/plain') {
+      throw new ValidationError('Esta inscripción no es un bitmap válido');
+    }
+
+    const bitmapNumber = parseInt(data.name);
+    if (!isNaN(bitmapNumber) && utxo.height !== bitmapNumber) {
+      throw new ValidationError('El block number no coincide con la inscripción');
+    }
+
+    const listing = this.listingRepo.create(data);
 
     this.listingRepo.updatePsbtFields(listing.id, {
       unsignedPsbt: psbtResult.unsignedPsbt,
