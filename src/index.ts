@@ -1,4 +1,3 @@
-import 'express-async-errors';
 import express, { Request, Response, Express } from 'express';
 import { config } from './config/environment';
 import { corsMiddleware } from './config/cors';
