@@ -55,6 +55,10 @@ export const createListingSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   imageUrl: z.string().url().or(z.literal('')),
+  inscriptionUtxo: z.string().optional(),
+  inscriptionValue: z.number().optional(),
+  inscriptionContentType: z.string().optional(),
+  inscriptionHeight: z.number().optional(),
 });
 
 export const updateListingSchema = z.object({

@@ -227,8 +227,11 @@ export class AssetProxyService {
       const metaprotocol = detailResponse?.metaprotocol ?? null;
       const contentType: string | null = (contentResponse.contentType as string) || null;
       const body = contentResponse.body;
+      const output: string | null = detailResponse?.output ?? null;
+      const value: number | null = detailResponse?.value ?? null;
+      const height: number | null = detailResponse?.height ?? null;
 
-      return this.identifyCollection(id, address, contentType, metaprotocol, body || null, inscriptionNumber);
+      return this.identifyCollection(id, address, contentType, metaprotocol, body || null, inscriptionNumber, output, value, height);
     } catch (error: any) {
       logger.error('Failed to process inscription', { id, error: error.message });
       return null;
@@ -241,7 +244,10 @@ export class AssetProxyService {
     contentType: string | null,
     metaprotocol: string | null,
     content: string | null,
-    inscriptionNumber: number
+    inscriptionNumber: number,
+    output: string | null,
+    value: number | null,
+    height: number | null
   ): AssetInscription {
     let protocol: string | null = null;
     let tick: string | null = null;
@@ -322,7 +328,7 @@ export class AssetProxyService {
       name: finalName,
       metaprotocol,
       contentType,
-      height: null,
+      height,
       isBitmap,
       collectionName,
       protocol,
@@ -331,7 +337,9 @@ export class AssetProxyService {
       isParcel,
       isBittickAgent,
       imageInscriptionId,
-      imageContentType: null
+      imageContentType: null,
+      output,
+      value
     };
   }
 

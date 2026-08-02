@@ -41,23 +41,25 @@ export class BitmapService {
       throw new ValidationError('Bitmap is already listed for sale');
     }
 
+    if (data.inscriptionContentType && data.inscriptionContentType !== 'text/plain') {
+      throw new ValidationError('Esta inscripción no es un bitmap válido');
+    }
+
+    if (data.inscriptionHeight && data.name) {
+      const bitmapNumber = parseInt(data.name);
+      if (!isNaN(bitmapNumber) && data.inscriptionHeight !== bitmapNumber) {
+        throw new ValidationError('El block number no coincide con la inscripción');
+      }
+    }
+
     const psbtResult = await this.psbtService.createListingPSBT(
       data.inscriptionId,
       data.sellerPaymentAddress,
       data.price,
-      data.sellerOrdinalPublicKey
+      data.sellerOrdinalPublicKey,
+      data.inscriptionUtxo,
+      data.inscriptionValue
     );
-
-    const utxo = psbtResult.inscriptionUtxo;
-
-    if (utxo.contentType !== 'text/plain') {
-      throw new ValidationError('Esta inscripción no es un bitmap válido');
-    }
-
-    const bitmapNumber = parseInt(data.name);
-    if (!isNaN(bitmapNumber) && utxo.height !== bitmapNumber) {
-      throw new ValidationError('El block number no coincide con la inscripción');
-    }
 
     const listing = this.listingRepo.create(data);
 

@@ -37,6 +37,11 @@ export interface BitmapListingCreate {
   // PSBT fields
   sellerOrdinalPublicKey: string;
   sellerPaymentAddress: string;
+  // Client-provided UTXO data (from ordinals.com, fetched during Mis Activos)
+  inscriptionUtxo?: string;
+  inscriptionValue?: number;
+  inscriptionContentType?: string;
+  inscriptionHeight?: number;
 }
 
 export interface BitmapListingUpdate {

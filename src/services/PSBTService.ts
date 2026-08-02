@@ -48,18 +48,30 @@ export class PSBTService {
     inscriptionId: string,
     sellerPaymentAddress: string,
     price: number,
-    sellerOrdinalPublicKey: string
+    sellerOrdinalPublicKey: string,
+    clientUtxo?: string,
+    clientValue?: number
   ): Promise<ListingPSBTData> {
     logger.info('Creating listing PSBT', { inscriptionId, sellerPaymentAddress, price });
 
-    const inscriptionUtxo = await this.fetchInscriptionUTXO(inscriptionId);
+    let inscriptionUtxo: InscriptionUTXO;
 
-    if (!inscriptionUtxo) {
-      throw new ValidationError('Could not fetch inscription UTXO');
-    }
-
-    if (price > inscriptionUtxo.value) {
-      throw new ValidationError(`Price (${price} sat) exceeds inscription value (${inscriptionUtxo.value} sat)`);
+    if (clientUtxo && clientValue) {
+      const parts = clientUtxo.split(':');
+      inscriptionUtxo = {
+        txid: parts[0] || '',
+        vout: parseInt(parts[1] || '0', 10),
+        value: clientValue,
+        satpoint: clientUtxo + ':0',
+        contentType: 'text/plain',
+        height: 0,
+      };
+    } else {
+      const fetched = await this.fetchInscriptionUTXO(inscriptionId);
+      if (!fetched) {
+        throw new ValidationError('Could not fetch inscription UTXO');
+      }
+      inscriptionUtxo = fetched;
     }
 
     const psbt = new bitcoin.Psbt({ network: NETWORK });

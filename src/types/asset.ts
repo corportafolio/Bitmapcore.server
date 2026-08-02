@@ -14,6 +14,8 @@ export interface AssetInscription {
   isBittickAgent: boolean;
   imageInscriptionId: string | null;
   imageContentType: string | null;
+  output: string | null;
+  value: number | null;
 }
 
 export interface AssetCollection {
