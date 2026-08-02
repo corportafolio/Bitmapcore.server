@@ -67,11 +67,7 @@ export class PSBTService {
         height: 0,
       };
     } else {
-      const fetched = await this.fetchInscriptionUTXO(inscriptionId);
-      if (!fetched) {
-        throw new ValidationError('Could not fetch inscription UTXO');
-      }
-      inscriptionUtxo = fetched;
+      throw new ValidationError('Datos de UTXO incompletos. Reconecta la wallet e intenta de nuevo.');
     }
 
     const psbt = new bitcoin.Psbt({ network: NETWORK });
