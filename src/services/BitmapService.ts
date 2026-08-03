@@ -67,6 +67,9 @@ export class BitmapService {
       psbtLength: psbtResult.unsignedPsbt.length
     });
 
+    // Trigger immediate local marketplace refresh on port 5500
+    await this.triggerLocalMarketplaceRefresh();
+
     return {
       listing,
       psbtToSign: psbtResult.unsignedPsbt,
