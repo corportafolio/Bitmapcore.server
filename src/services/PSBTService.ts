@@ -211,9 +211,19 @@ export class PSBTService {
     return rawTx;
   }
 
-  validateSignedListingPSBT(psbtBase64: string, expectedSellerPaymentAddress: string, expectedPrice: number): boolean {
+  validateSignedListingPSBT(psbtInput: string, expectedSellerPaymentAddress: string, expectedPrice: number): boolean {
     try {
-      const psbt = bitcoin.Psbt.fromBase64(psbtBase64, { network: NETWORK });
+      let psbt: bitcoin.Psbt;
+
+      const cleanInput = psbtInput.trim();
+
+      if (/^[0-9a-fA-F]+$/.test(cleanInput) && cleanInput.length % 2 === 0) {
+        const buf = Buffer.from(cleanInput, 'hex');
+        psbt = bitcoin.Psbt.fromBuffer(buf, { network: NETWORK });
+      } else {
+        psbt = bitcoin.Psbt.fromBase64(cleanInput, { network: NETWORK });
+      }
+
       logger.info('PSBT parsed successfully', {
         inputCount: psbt.data.inputs.length,
         outputCount: psbt.data.outputs.length,
