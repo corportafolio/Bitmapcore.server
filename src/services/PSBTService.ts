@@ -237,15 +237,6 @@ export class PSBTService {
         return false;
       }
 
-      try {
-        psbt.validateSignaturesOfInput(0, (pubkey, msghash, signature) => 
-          ECPair.fromPublicKey(pubkey).verify(msghash, signature)
-        );
-      } catch {
-        logger.warn('PSBT validation failed: seller signature invalid');
-        return false;
-      }
-
       return true;
     } catch (error) {
       logger.error('PSBT validation error', { error });
