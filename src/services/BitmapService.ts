@@ -294,7 +294,7 @@ export class BitmapService {
         signal: AbortSignal.timeout(5000),
       });
       if (response.ok) {
-        const result = await response.json();
+        const result = await response.json() as { inserted?: number };
         logger.info('Local marketplace refresh triggered', { inserted: result.inserted });
       } else {
         logger.warn('Local marketplace refresh failed', { status: response.status });
