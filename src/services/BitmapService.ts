@@ -198,6 +198,7 @@ export class BitmapService {
       signedPsbt,
       psbtStatus: 'signed',
       price: newPrice,
+      listedAt: Date.now(),
     });
 
     logger.info('Price update signed and activated', { listingId, newPrice });

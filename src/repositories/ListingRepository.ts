@@ -173,7 +173,7 @@ export class ListingRepository {
     return this.findById(id)!;
   }
 
-  updatePsbtFields(id: string, fields: { unsignedPsbt?: string; signedPsbt?: string; psbtStatus?: string; price?: number }): void {
+  updatePsbtFields(id: string, fields: { unsignedPsbt?: string; signedPsbt?: string; psbtStatus?: string; price?: number; listedAt?: number }): void {
     const db = getDb();
     const updates: string[] = [];
     const values: (string | number)[] = [];
@@ -193,6 +193,10 @@ export class ListingRepository {
     if (fields.price !== undefined) {
       updates.push('price = ?');
       values.push(fields.price);
+    }
+    if (fields.listedAt !== undefined) {
+      updates.push('listed_at = ?');
+      values.push(fields.listedAt);
     }
 
     if (updates.length === 0) return;
