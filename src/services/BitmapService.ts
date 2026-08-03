@@ -104,6 +104,9 @@ export class BitmapService {
 
     logger.info('Listing signed and activated', { listingId });
 
+    // Trigger immediate local marketplace refresh on port 5500
+    await this.triggerLocalMarketplaceRefresh();
+
     return this.listingRepo.findById(listingId)!;
   }
 
@@ -199,6 +202,9 @@ export class BitmapService {
 
     logger.info('Price update signed and activated', { listingId, newPrice });
 
+    // Trigger immediate local marketplace refresh on port 5500
+    await this.triggerLocalMarketplaceRefresh();
+
     return this.listingRepo.findById(listingId)!;
   }
 
@@ -277,5 +283,25 @@ export class BitmapService {
   async getSoldListingsSince(sinceTimestamp: number): Promise<BitmapListing[]> {
     logger.debug('Getting sold listings since', { sinceTimestamp });
     return this.listingRepo.findSoldSince(sinceTimestamp);
+  }
+
+  private async triggerLocalMarketplaceRefresh(): Promise<void> {
+    try {
+      const response = await fetch('http://127.0.0.1:5500/api/v1/internal/refresh-local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Fire and forget with short timeout
+        signal: AbortSignal.timeout(5000),
+      });
+      if (response.ok) {
+        const result = await response.json();
+        logger.info('Local marketplace refresh triggered', { inserted: result.inserted });
+      } else {
+        logger.warn('Local marketplace refresh failed', { status: response.status });
+      }
+    } catch (err: any) {
+      // Don't throw - this is fire-and-forget
+      logger.warn('Local marketplace refresh error (non-blocking)', { message: err.message });
+    }
   }
 }
