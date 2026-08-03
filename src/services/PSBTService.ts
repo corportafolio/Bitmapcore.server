@@ -105,6 +105,60 @@ export class PSBTService {
     };
   }
 
+  async createPriceUpdatePSBT(
+    inscriptionId: string,
+    sellerPaymentAddress: string,
+    newPrice: number,
+    sellerOrdinalPublicKey: string,
+    clientUtxo: string,
+    clientValue: number
+  ): Promise<ListingPSBTData> {
+    logger.info('Creating price update PSBT', { inscriptionId, sellerPaymentAddress, newPrice });
+
+    const parts = clientUtxo.split(':');
+    const inscriptionUtxo: InscriptionUTXO = {
+      txid: parts[0] || '',
+      vout: parseInt(parts[1] || '0', 10),
+      value: clientValue,
+      satpoint: clientUtxo + ':0',
+      contentType: 'text/plain',
+      height: 0,
+    };
+
+    const psbt = new bitcoin.Psbt({ network: NETWORK });
+
+    psbt.addInput({
+      hash: inscriptionUtxo.txid,
+      index: inscriptionUtxo.vout,
+      witnessUtxo: {
+        script: bitcoin.address.toOutputScript(sellerPaymentAddress, NETWORK),
+        value: BigInt(inscriptionUtxo.value),
+      },
+      tapInternalKey: this.pubkeyToXOnly(sellerOrdinalPublicKey),
+    });
+
+    psbt.addOutput({
+      address: sellerPaymentAddress,
+      value: BigInt(newPrice),
+    });
+
+    const unsignedPsbtBase64 = psbt.toBase64();
+
+    logger.info('Price update PSBT created', { 
+      inscriptionId, 
+      psbtLength: unsignedPsbtBase64.length,
+      inputCount: psbt.data.inputs.length,
+      outputCount: psbt.data.outputs.length
+    });
+
+    return {
+      unsignedPsbt: unsignedPsbtBase64,
+      inscriptionUtxo,
+      sellerPaymentAddress,
+      price: newPrice,
+    };
+  }
+
   async completePurchasePSBT(
     signedListingPsbtBase64: string,
     buyerAddress: string,

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { BitmapService, CreateListingResult } from '../services/BitmapService';
-import { validateBody, createListingSchema, updateListingSchema, validateUUID, signListingSchema } from '../middleware/validation';
+import { validateBody, createListingSchema, updateListingSchema, validateUUID, signListingSchema, priceUpdatePsbtSchema, priceUpdateSignSchema } from '../middleware/validation';
 import { sendSuccess, sendNotFound } from '../utils/responseFormatter';
 import { BitmapListingCreate, BitmapListingUpdate } from '../types/bitmap';
 
@@ -59,6 +59,30 @@ router.post('/:id/sign', validateUUID('id'), validateBody(signListingSchema), as
   try {
     const { signedPsbt, sellerOrdinalPublicKey } = req.body;
     const listing = await bitmapService.signListing(req.params.id, signedPsbt, sellerOrdinalPublicKey);
+    sendSuccess(res, listing);
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/price-psbt', validateUUID('id'), async (req: Request, res: Response, next) => {
+  try {
+    const newPrice = parseInt(req.query.newPrice as string);
+    const clientUtxo = req.query.clientUtxo as string;
+    const clientValue = parseInt(req.query.clientValue as string);
+    const sellerAddress = req.headers['wallet-address'] as string;
+
+    if (!newPrice || !clientUtxo || !clientValue || !sellerAddress) {
+      return sendNotFound(res, 'Missing required params: newPrice, clientUtxo, clientValue, wallet-address header');
+    }
+
+    const result = await bitmapService.getPriceUpdatePSBT(req.params.id, newPrice, sellerAddress, clientUtxo, clientValue);
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/price-sign', validateUUID('id'), validateBody(priceUpdateSignSchema), async (req: Request, res: Response, next) => {
+  try {
+    const { signedPsbt, sellerOrdinalPublicKey, newPrice } = req.body;
+    const listing = await bitmapService.signPriceUpdate(req.params.id, signedPsbt, sellerOrdinalPublicKey, newPrice);
     sendSuccess(res, listing);
   } catch (err) { next(err); }
 });

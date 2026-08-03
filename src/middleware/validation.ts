@@ -69,3 +69,15 @@ export const signListingSchema = z.object({
   signedPsbt: z.string().min(20),
   sellerOrdinalPublicKey: z.string().min(66).max(130),
 });
+
+export const priceUpdatePsbtSchema = z.object({
+  newPrice: z.number().positive(),
+  clientUtxo: z.string().min(1),
+  clientValue: z.number().positive(),
+});
+
+export const priceUpdateSignSchema = z.object({
+  signedPsbt: z.string().min(20),
+  sellerOrdinalPublicKey: z.string().min(66).max(130),
+  newPrice: z.number().positive(),
+});

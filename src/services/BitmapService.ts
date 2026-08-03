@@ -107,6 +107,101 @@ export class BitmapService {
     return this.listingRepo.findById(listingId)!;
   }
 
+  async getPriceUpdatePSBT(
+    listingId: string,
+    newPrice: number,
+    sellerAddress: string,
+    clientUtxo: string,
+    clientValue: number
+  ): Promise<{ unsignedPsbt: string; listing: BitmapListing }> {
+    const listing = this.listingRepo.findById(listingId);
+    if (!listing) {
+      throw new NotFoundError('Listing not found');
+    }
+
+    if (listing.sellerAddress !== sellerAddress) {
+      throw new ValidationError('You are not the seller of this listing');
+    }
+
+    if (!listing.isActive) {
+      throw new ValidationError('Listing is not active');
+    }
+
+    if (newPrice <= 0) {
+      throw new ValidationError('Price must be greater than 0');
+    }
+
+    if (!listing.sellerOrdinalPublicKey || !listing.sellerPaymentAddress) {
+      throw new ValidationError('Listing missing PSBT data');
+    }
+
+    const psbtResult = await this.psbtService.createPriceUpdatePSBT(
+      listing.inscriptionId,
+      listing.sellerPaymentAddress,
+      newPrice,
+      listing.sellerOrdinalPublicKey,
+      clientUtxo,
+      clientValue
+    );
+
+    this.listingRepo.updatePsbtFields(listingId, {
+      unsignedPsbt: psbtResult.unsignedPsbt,
+      psbtStatus: 'created',
+    });
+
+    logger.info('Price update PSBT generated', { listingId, newPrice });
+
+    const updatedListing = this.listingRepo.findById(listingId)!;
+    return {
+      unsignedPsbt: psbtResult.unsignedPsbt,
+      listing: updatedListing,
+    };
+  }
+
+  async signPriceUpdate(
+    listingId: string,
+    signedPsbt: string,
+    sellerOrdinalPublicKey: string,
+    newPrice: number
+  ): Promise<BitmapListing> {
+    const listing = this.listingRepo.findById(listingId);
+    if (!listing) {
+      throw new NotFoundError('Listing not found');
+    }
+
+    if (listing.psbtStatus !== 'created') {
+      throw new ValidationError(`Listing is not in 'created' state: ${listing.psbtStatus}`);
+    }
+
+    if (listing.sellerOrdinalPublicKey !== sellerOrdinalPublicKey) {
+      throw new ValidationError('Public key does not match listing');
+    }
+
+    if (newPrice <= 0) {
+      throw new ValidationError('Price must be greater than 0');
+    }
+
+    const isValid = this.psbtService.validateSignedListingPSBT(
+      signedPsbt,
+      listing.sellerPaymentAddress!,
+      newPrice
+    );
+
+    if (!isValid) {
+      throw new ValidationError('Invalid PSBT signature for new price');
+    }
+
+    this.listingRepo.updatePsbtFields(listingId, {
+      signedPsbt,
+      psbtStatus: 'signed',
+      price: newPrice,
+    });
+
+    logger.info('Price update signed and activated', { listingId, newPrice });
+
+    return this.listingRepo.findById(listingId)!;
+  }
+
   async getListings(page: number = 1, limit: number = 20, sort: string = 'listed_desc'): Promise<ListingsResponse> {
     logger.debug('Getting listings', { page, limit, sort });
     const result = this.listingRepo.findActiveWithPaginationAndSort(page, limit, sort);
