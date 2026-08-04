@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { BitmapService, CreateListingResult } from '../services/BitmapService';
-import { validateBody, createListingSchema, updateListingSchema, validateUUID, signListingSchema, priceUpdatePsbtSchema, priceUpdateSignSchema } from '../middleware/validation';
+import { validateBody, createListingSchema, updateListingSchema, validateUUID, signListingSchema, priceUpdatePsbtSchema, priceUpdateSignSchema, batchListSchema, batchSignSchema } from '../middleware/validation';
 import { sendSuccess, sendNotFound } from '../utils/responseFormatter';
 import { BitmapListingCreate, BitmapListingUpdate } from '../types/bitmap';
 
@@ -107,6 +107,22 @@ router.delete('/:id', validateUUID('id'), async (req: Request, res: Response, ne
     }
     await bitmapService.deleteListing(req.params.id, sellerAddress);
     sendSuccess(res, { deleted: true });
+  } catch (err) { next(err); }
+});
+
+router.post('/batch', validateBody(batchListSchema), async (req: Request, res: Response, next) => {
+  try {
+    const { items } = req.body;
+    const result = await bitmapService.createBatchListing(items);
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+});
+
+router.post('/batch/sign', validateBody(batchSignSchema), async (req: Request, res: Response, next) => {
+  try {
+    const { listingIds, signedPsbt, sellerOrdinalPublicKey } = req.body;
+    const result = await bitmapService.signBatchListings(listingIds, signedPsbt, sellerOrdinalPublicKey);
+    sendSuccess(res, result);
   } catch (err) { next(err); }
 });
 

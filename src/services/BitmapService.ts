@@ -289,6 +289,177 @@ export class BitmapService {
     return this.listingRepo.findSoldSince(sinceTimestamp);
   }
 
+  async createBatchListing(items: Array<{
+    inscriptionId: string;
+    price: number;
+    sellerAddress: string;
+    sellerOrdinalPublicKey: string;
+    sellerPaymentAddress: string;
+    name: string;
+    imageUrl: string;
+    bitmapNumber: number;
+    inscriptionNumber: number;
+    inscriptionUtxo: string;
+    inscriptionValue: number;
+    inscriptionContentType: string;
+    inscriptionHeight: number;
+    isPriceUpdate: boolean;
+  }>): Promise<{ listingIds: string[]; psbtToSign: string }> {
+    logger.info('Creating batch listing', { count: items.length });
+
+    const listingIds: string[] = [];
+    const psbtInputs: Array<{
+      txid: string;
+      vout: number;
+      value: number;
+      tapInternalKey: Buffer;
+      sellerPaymentAddress: string;
+      price: number;
+    }> = [];
+
+    for (const item of items) {
+      if (!isValidBitcoinAddress(item.sellerAddress)) {
+        throw new ValidationError('Invalid seller Bitcoin address');
+      }
+      if (!isValidBitcoinAddress(item.sellerPaymentAddress)) {
+        throw new ValidationError('Invalid seller payment address');
+      }
+      if (item.inscriptionContentType && !item.inscriptionContentType.startsWith('text/plain')) {
+        throw new ValidationError('Esta inscripción no es un bitmap válido');
+      }
+
+      const parts = item.inscriptionUtxo.split(':');
+      const inscriptionUtxo = {
+        txid: parts[0] || '',
+        vout: parseInt(parts[1] || '0', 10),
+        value: item.inscriptionValue,
+        satpoint: item.inscriptionUtxo + ':0',
+        contentType: item.inscriptionContentType || 'text/plain',
+        height: item.inscriptionHeight,
+      };
+
+      const existing = this.listingRepo.findByInscriptionId(item.inscriptionId);
+      
+      if (item.isPriceUpdate && existing) {
+        if (!existing.isActive) {
+          throw new ValidationError('Listing is not active');
+        }
+        if (existing.sellerAddress !== item.sellerAddress) {
+          throw new ValidationError('You are not the seller of this listing');
+        }
+        if (!existing.sellerOrdinalPublicKey || !existing.sellerPaymentAddress) {
+          throw new ValidationError('Listing missing PSBT data');
+        }
+
+        this.listingRepo.updatePsbtFields(existing.id, {
+          price: item.price,
+          listedAt: Date.now(),
+          psbtStatus: 'created',
+        });
+
+        listingIds.push(existing.id);
+        psbtInputs.push({
+          txid: inscriptionUtxo.txid,
+          vout: inscriptionUtxo.vout,
+          value: inscriptionUtxo.value,
+          tapInternalKey: this.psbtService.pubkeyToXOnly(existing.sellerOrdinalPublicKey),
+          sellerPaymentAddress: existing.sellerPaymentAddress,
+          price: item.price,
+        });
+      } else {
+        if (existing && existing.isActive) {
+          throw new ValidationError('Bitmap is already listed for sale');
+        }
+
+        const listing = this.listingRepo.create({
+          inscriptionId: item.inscriptionId,
+          name: item.name,
+          description: '',
+          price: item.price,
+          sellerAddress: item.sellerAddress,
+          imageUrl: item.imageUrl,
+          bitmapNumber: item.bitmapNumber,
+          inscriptionNumber: item.inscriptionNumber,
+          bitmapHash: item.inscriptionId.split('i')[1]?.split('i')[0] || '',
+          ownerAddress: item.sellerAddress,
+          sellerOrdinalPublicKey: item.sellerOrdinalPublicKey,
+          sellerPaymentAddress: item.sellerPaymentAddress,
+        });
+
+        listingIds.push(listing.id);
+        psbtInputs.push({
+          txid: inscriptionUtxo.txid,
+          vout: inscriptionUtxo.vout,
+          value: inscriptionUtxo.value,
+          tapInternalKey: this.psbtService.pubkeyToXOnly(item.sellerOrdinalPublicKey),
+          sellerPaymentAddress: item.sellerPaymentAddress,
+          price: item.price,
+        });
+      }
+    }
+
+    const psbt = await this.psbtService.createBatchListingPSBT(psbtInputs);
+
+    for (const id of listingIds) {
+      this.listingRepo.updatePsbtFields(id, {
+        unsignedPsbt: psbt.unsignedPsbt,
+        psbtStatus: 'created',
+      });
+    }
+
+    await this.triggerLocalMarketplaceRefresh();
+
+    return {
+      listingIds,
+      psbtToSign: psbt.unsignedPsbt,
+    };
+  }
+
+  async signBatchListings(listingIds: string[], signedPsbt: string, sellerOrdinalPublicKey: string): Promise<BitmapListing[]> {
+    logger.info('Signing batch listings', { count: listingIds.length });
+
+    const results: BitmapListing[] = [];
+
+    for (const listingId of listingIds) {
+      const listing = this.listingRepo.findById(listingId);
+      if (!listing) {
+        throw new ValidationError(`Listing not found: ${listingId}`);
+      }
+
+      if (listing.psbtStatus !== 'created') {
+        throw new ValidationError(`Listing is not in 'created' state: ${listing.psbtStatus}`);
+      }
+
+      if (listing.sellerOrdinalPublicKey !== sellerOrdinalPublicKey) {
+        throw new ValidationError('Public key does not match listing');
+      }
+
+      const isValid = this.psbtService.validateSignedListingPSBT(
+        signedPsbt,
+        listing.sellerPaymentAddress!,
+        listing.price
+      );
+
+      if (!isValid) {
+        throw new ValidationError('Invalid PSBT signature');
+      }
+
+      const isPriceUpdate = listing.listedAt && listing.listedAt < Date.now() - 1000;
+
+      this.listingRepo.updatePsbtFields(listingId, {
+        signedPsbt,
+        psbtStatus: 'signed',
+        ...(isPriceUpdate ? { listedAt: Date.now() } : {}),
+      });
+
+      results.push(this.listingRepo.findById(listingId)!);
+    }
+
+    await this.triggerLocalMarketplaceRefresh();
+
+    return results;
+  }
+
   private async triggerLocalMarketplaceRefresh(): Promise<void> {
     try {
       const response = await fetch('http://127.0.0.1:5500/api/v1/internal/refresh-local', {

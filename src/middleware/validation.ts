@@ -81,3 +81,30 @@ export const priceUpdateSignSchema = z.object({
   sellerOrdinalPublicKey: z.string().min(66).max(130),
   newPrice: z.number().positive(),
 });
+
+export const batchListItemSchema = z.object({
+  inscriptionId: z.string().min(10),
+  price: z.number().positive(),
+  sellerAddress: z.string().min(26).max(62),
+  sellerOrdinalPublicKey: z.string().min(66).max(130),
+  sellerPaymentAddress: z.string().min(26).max(62),
+  name: z.string().min(1).max(255),
+  imageUrl: z.string().url().or(z.literal('')),
+  bitmapNumber: z.number().positive(),
+  inscriptionNumber: z.number().positive(),
+  inscriptionUtxo: z.string().min(1),
+  inscriptionValue: z.number().positive(),
+  inscriptionContentType: z.string().optional(),
+  inscriptionHeight: z.number().optional(),
+  isPriceUpdate: z.boolean(),
+});
+
+export const batchListSchema = z.object({
+  items: z.array(batchListItemSchema).min(1),
+});
+
+export const batchSignSchema = z.object({
+  listingIds: z.array(z.string().uuid()).min(1),
+  signedPsbt: z.string().min(20),
+  sellerOrdinalPublicKey: z.string().min(66).max(130),
+});

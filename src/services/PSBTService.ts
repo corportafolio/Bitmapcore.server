@@ -159,6 +159,48 @@ export class PSBTService {
     };
   }
 
+  async createBatchListingPSBT(inputs: Array<{
+    txid: string;
+    vout: number;
+    value: number;
+    tapInternalKey: Buffer;
+    sellerPaymentAddress: string;
+    price: number;
+  }>): Promise<{ unsignedPsbt: string }> {
+    logger.info('Creating batch listing PSBT', { inputCount: inputs.length });
+
+    const psbt = new bitcoin.Psbt({ network: NETWORK });
+
+    for (const input of inputs) {
+      psbt.addInput({
+        hash: input.txid,
+        index: input.vout,
+        witnessUtxo: {
+          script: bitcoin.address.toOutputScript(input.sellerPaymentAddress, NETWORK),
+          value: BigInt(input.value),
+        },
+        tapInternalKey: input.tapInternalKey,
+      });
+
+      psbt.addOutput({
+        address: input.sellerPaymentAddress,
+        value: BigInt(input.price),
+      });
+    }
+
+    const unsignedPsbtBase64 = psbt.toBase64();
+
+    logger.info('Batch listing PSBT created', {
+      psbtLength: unsignedPsbtBase64.length,
+      inputCount: psbt.data.inputs.length,
+      outputCount: psbt.data.outputs.length,
+    });
+
+    return {
+      unsignedPsbt: unsignedPsbtBase64,
+    };
+  }
+
   async completePurchasePSBT(
     signedListingPsbtBase64: string,
     buyerAddress: string,
@@ -355,7 +397,7 @@ export class PSBTService {
     }
   }
 
-  private pubkeyToXOnly(pubkey: string): Buffer {
+  public pubkeyToXOnly(pubkey: string): Buffer {
     const pubkeyBuffer = Buffer.from(pubkey, 'hex');
     if (pubkeyBuffer.length === 33) {
       return pubkeyBuffer.subarray(1, 33);
