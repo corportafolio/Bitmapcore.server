@@ -7,6 +7,23 @@ import { BitmapListingCreate, BitmapListingUpdate } from '../types/bitmap';
 const router: Router = Router();
 const bitmapService = new BitmapService();
 
+// Batch routes DEBEN ir ANTES de /:id/sign para que no matcheen con :id = "batch"
+router.post('/batch', validateBody(batchListSchema), async (req: Request, res: Response, next) => {
+  try {
+    const { items } = req.body;
+    const result = await bitmapService.createBatchListing(items);
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+});
+
+router.post('/batch/sign', validateBody(batchSignSchema), async (req: Request, res: Response, next) => {
+  try {
+    const { listingIds, signedPsbt, sellerOrdinalPublicKey } = req.body;
+    const result = await bitmapService.signBatchListings(listingIds, signedPsbt, sellerOrdinalPublicKey);
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+});
+
 router.get('/', async (req: Request, res: Response, next) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
@@ -107,22 +124,6 @@ router.delete('/:id', validateUUID('id'), async (req: Request, res: Response, ne
     }
     await bitmapService.deleteListing(req.params.id, sellerAddress);
     sendSuccess(res, { deleted: true });
-  } catch (err) { next(err); }
-});
-
-router.post('/batch', validateBody(batchListSchema), async (req: Request, res: Response, next) => {
-  try {
-    const { items } = req.body;
-    const result = await bitmapService.createBatchListing(items);
-    sendSuccess(res, result);
-  } catch (err) { next(err); }
-});
-
-router.post('/batch/sign', validateBody(batchSignSchema), async (req: Request, res: Response, next) => {
-  try {
-    const { listingIds, signedPsbt, sellerOrdinalPublicKey } = req.body;
-    const result = await bitmapService.signBatchListings(listingIds, signedPsbt, sellerOrdinalPublicKey);
-    sendSuccess(res, result);
   } catch (err) { next(err); }
 });
 
