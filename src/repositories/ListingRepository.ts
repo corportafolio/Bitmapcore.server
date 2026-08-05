@@ -2,6 +2,16 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database/db';
 import { BitmapListing, BitmapListingCreate, BitmapListingUpdate } from '../types/bitmap';
 import { NotFoundError } from '../errors/AppError';
+import * as path from 'path';
+import Database from 'better-sqlite3';
+
+interface BlockRow {
+  bloque: number;
+  etiquetas: string;
+  totalTransacciones: string;
+  hash: string;
+  totalBtc: string;
+}
 
 interface ListingRow {
   id: string;
@@ -24,6 +34,10 @@ interface ListingRow {
   unsigned_psbt: string | null;
   signed_psbt: string | null;
   psbt_status: string | null;
+  etiquetas?: string;
+  totalTransacciones?: string;
+  hash?: string;
+  totalBtc?: string;
 }
 
 function rowToListing(row: ListingRow): BitmapListing {
@@ -48,10 +62,23 @@ function rowToListing(row: ListingRow): BitmapListing {
     unsignedPsbt: row.unsigned_psbt || undefined,
     signedPsbt: row.signed_psbt || undefined,
     psbtStatus: (row.psbt_status as 'created' | 'signed' | 'sold' | 'expired') || undefined,
+    etiquetas: row.etiquetas,
+    totalTransacciones: row.totalTransacciones,
+    hash: row.hash,
+    totalBtc: row.totalBtc,
   };
 }
 
 export class ListingRepository {
+  private blocksDb: Database.Database | null = null;
+
+  private getBlocksDb(): Database.Database {
+    if (!this.blocksDb) {
+      const blocksDbPath = path.join('/root/bitmapcore-web/data/bitmapcorp_database.db');
+      this.blocksDb = new Database(blocksDbPath, { readonly: true });
+    }
+    return this.blocksDb;
+  }
   create(data: BitmapListingCreate): BitmapListing {
     const db = getDb();
     const id = uuidv4();
@@ -96,28 +123,40 @@ export class ListingRepository {
 
   findAllActive(): BitmapListing[] {
     const db = getDb();
+    const blocksDb = this.getBlocksDb();
+    
+    blocksDb.prepare('ATTACH DATABASE ? AS maindb').run('/root/bitmapcore-web/data/bitmapcorp_database.db');
+    
     const rows = db.prepare(`
-      SELECT * FROM listings 
-      WHERE is_active = 1 
-      ORDER BY listed_at DESC
+      SELECT l.*, b.etiquetas, b.totalTransacciones, b.hash, b.totalBtc
+      FROM listings l
+      LEFT JOIN maindb.blocks b ON l.bitmap_number = b.bloque
+      WHERE l.is_active = 1 
+      ORDER BY l.listed_at DESC
     `).all() as ListingRow[];
     return rows.map(rowToListing);
   }
 
   findActiveWithPaginationAndSort(page: number, limit: number, sort: string): { items: BitmapListing[]; total: number; floorPrice: number } {
     const db = getDb();
+    const blocksDb = this.getBlocksDb();
+    
+    blocksDb.prepare('ATTACH DATABASE ? AS maindb').run('/root/bitmapcore-web/data/bitmapcorp_database.db');
+    
     const offset = (page - 1) * limit;
 
-    let orderClause = 'ORDER BY listed_at DESC';
-    if (sort === 'price_asc') orderClause = 'ORDER BY price ASC';
-    else if (sort === 'price_desc') orderClause = 'ORDER BY price DESC';
-    else if (sort === 'listed_desc') orderClause = 'ORDER BY listed_at DESC';
+    let orderClause = 'ORDER BY l.listed_at DESC';
+    if (sort === 'price_asc') orderClause = 'ORDER BY l.price ASC';
+    else if (sort === 'price_desc') orderClause = 'ORDER BY l.price DESC';
+    else if (sort === 'listed_desc') orderClause = 'ORDER BY l.listed_at DESC';
 
     const countResult = db.prepare('SELECT COUNT(*) as total FROM listings WHERE is_active = 1').get() as { total: number };
     const floorResult = db.prepare('SELECT COALESCE(MIN(price), 0) as floorPrice FROM listings WHERE is_active = 1 AND price > 0').get() as { floorPrice: number };
     const rows = db.prepare(`
-      SELECT * FROM listings 
-      WHERE is_active = 1 
+      SELECT l.*, b.etiquetas, b.totalTransacciones, b.hash, b.totalBtc
+      FROM listings l
+      LEFT JOIN maindb.blocks b ON l.bitmap_number = b.bloque
+      WHERE l.is_active = 1 
       ${orderClause}
       LIMIT ? OFFSET ?
     `).all(limit, offset) as ListingRow[];

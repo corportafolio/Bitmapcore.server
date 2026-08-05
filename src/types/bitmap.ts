@@ -15,6 +15,11 @@ export interface BitmapListing {
   inscriptionNumber?: number;
   bitmapHash?: string;
   ownerAddress?: string;
+  // Datos de bloque (para imágenes Mondrian)
+  etiquetas?: string;
+  totalTransacciones?: string;
+  hash?: string;
+  totalBtc?: string;
   // PSBT fields for trustless trading
   sellerOrdinalPublicKey?: string;
   sellerPaymentAddress?: string;
