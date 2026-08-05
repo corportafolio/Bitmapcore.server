@@ -399,6 +399,9 @@ export class PSBTService {
 
   public pubkeyToXOnly(pubkey: string): Buffer {
     const pubkeyBuffer = Buffer.from(pubkey, 'hex');
+    if (pubkeyBuffer.length === 32) {
+      return pubkeyBuffer;
+    }
     if (pubkeyBuffer.length === 33) {
       return pubkeyBuffer.subarray(1, 33);
     }

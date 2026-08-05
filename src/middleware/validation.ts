@@ -50,7 +50,7 @@ export const createListingSchema = z.object({
   inscriptionId: z.string().min(10),
   price: z.number().positive(),
   sellerAddress: z.string().min(26).max(62),
-  sellerOrdinalPublicKey: z.string().min(66).max(130),
+  sellerOrdinalPublicKey: z.string().min(64).max(130),
   sellerPaymentAddress: z.string().min(26).max(62),
   name: z.string().min(1).max(255),
   description: z.string().optional(),
@@ -67,7 +67,7 @@ export const updateListingSchema = z.object({
 
 export const signListingSchema = z.object({
   signedPsbt: z.string().min(20),
-  sellerOrdinalPublicKey: z.string().min(66).max(130),
+  sellerOrdinalPublicKey: z.string().min(64).max(130),
 });
 
 export const priceUpdatePsbtSchema = z.object({
@@ -78,7 +78,7 @@ export const priceUpdatePsbtSchema = z.object({
 
 export const priceUpdateSignSchema = z.object({
   signedPsbt: z.string().min(20),
-  sellerOrdinalPublicKey: z.string().min(66).max(130),
+  sellerOrdinalPublicKey: z.string().min(64).max(130),
   newPrice: z.number().positive(),
 });
 
@@ -86,7 +86,7 @@ export const batchListItemSchema = z.object({
   inscriptionId: z.string().min(10),
   price: z.number().positive(),
   sellerAddress: z.string().min(26).max(62),
-  sellerOrdinalPublicKey: z.string().min(66).max(130),
+  sellerOrdinalPublicKey: z.string().min(64).max(130),
   sellerPaymentAddress: z.string().min(26).max(62),
   name: z.string().min(1).max(255),
   imageUrl: z.string().url().or(z.literal('')),
@@ -106,5 +106,5 @@ export const batchListSchema = z.object({
 export const batchSignSchema = z.object({
   listingIds: z.array(z.string().uuid()).min(1),
   signedPsbt: z.string().min(20),
-  sellerOrdinalPublicKey: z.string().min(66).max(130),
+  sellerOrdinalPublicKey: z.string().min(64).max(130),
 });
