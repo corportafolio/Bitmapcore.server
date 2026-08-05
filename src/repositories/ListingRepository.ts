@@ -60,6 +60,21 @@ function rowToListing(row: ListingRow): BitmapListing {
 }
 
 export class ListingRepository {
+  private static blocksDbAttached = false;
+
+  private static ensureBlocksDbAttached(db: import('better-sqlite3').Database): void {
+    if (ListingRepository.blocksDbAttached) return;
+    const dbs = db.prepare('PRAGMA database_list').all() as { name: string }[];
+    if (!dbs.some(d => d.name === 'maindb')) {
+      try {
+        db.prepare('ATTACH DATABASE ? AS maindb').run('/root/bitmapcore-web/data/bitmapcorp_database.db');
+      } catch (e) {
+        // Ya adjunto, ignorar
+      }
+    }
+    ListingRepository.blocksDbAttached = true;
+  }
+
   create(data: BitmapListingCreate): BitmapListing {
     const db = getDb();
     const id = uuidv4();
@@ -105,7 +120,7 @@ export class ListingRepository {
   findAllActive(): BitmapListing[] {
     const db = getDb();
     
-    db.prepare('ATTACH DATABASE ? AS maindb').run('/root/bitmapcore-web/data/bitmapcorp_database.db');
+    ListingRepository.ensureBlocksDbAttached(db);
     
     const rows = db.prepare(`
       SELECT l.*, b.etiquetas, b.totalTransacciones, b.hash, b.totalBtc
@@ -120,7 +135,7 @@ export class ListingRepository {
   findActiveWithPaginationAndSort(page: number, limit: number, sort: string): { items: BitmapListing[]; total: number; floorPrice: number } {
     const db = getDb();
     
-    db.prepare('ATTACH DATABASE ? AS maindb').run('/root/bitmapcore-web/data/bitmapcorp_database.db');
+    ListingRepository.ensureBlocksDbAttached(db);
     
     const offset = (page - 1) * limit;
 
