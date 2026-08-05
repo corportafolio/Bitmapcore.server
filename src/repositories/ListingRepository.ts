@@ -2,16 +2,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database/db';
 import { BitmapListing, BitmapListingCreate, BitmapListingUpdate } from '../types/bitmap';
 import { NotFoundError } from '../errors/AppError';
-import * as path from 'path';
-import Database from 'better-sqlite3';
-
-interface BlockRow {
-  bloque: number;
-  etiquetas: string;
-  totalTransacciones: string;
-  hash: string;
-  totalBtc: string;
-}
 
 interface ListingRow {
   id: string;
@@ -70,15 +60,6 @@ function rowToListing(row: ListingRow): BitmapListing {
 }
 
 export class ListingRepository {
-  private blocksDb: Database.Database | null = null;
-
-  private getBlocksDb(): Database.Database {
-    if (!this.blocksDb) {
-      const blocksDbPath = path.join('/root/bitmapcore-web/data/bitmapcorp_database.db');
-      this.blocksDb = new Database(blocksDbPath, { readonly: true });
-    }
-    return this.blocksDb;
-  }
   create(data: BitmapListingCreate): BitmapListing {
     const db = getDb();
     const id = uuidv4();
@@ -123,9 +104,8 @@ export class ListingRepository {
 
   findAllActive(): BitmapListing[] {
     const db = getDb();
-    const blocksDb = this.getBlocksDb();
     
-    blocksDb.prepare('ATTACH DATABASE ? AS maindb').run('/root/bitmapcore-web/data/bitmapcorp_database.db');
+    db.prepare('ATTACH DATABASE ? AS maindb').run('/root/bitmapcore-web/data/bitmapcorp_database.db');
     
     const rows = db.prepare(`
       SELECT l.*, b.etiquetas, b.totalTransacciones, b.hash, b.totalBtc
@@ -139,9 +119,8 @@ export class ListingRepository {
 
   findActiveWithPaginationAndSort(page: number, limit: number, sort: string): { items: BitmapListing[]; total: number; floorPrice: number } {
     const db = getDb();
-    const blocksDb = this.getBlocksDb();
     
-    blocksDb.prepare('ATTACH DATABASE ? AS maindb').run('/root/bitmapcore-web/data/bitmapcorp_database.db');
+    db.prepare('ATTACH DATABASE ? AS maindb').run('/root/bitmapcore-web/data/bitmapcorp_database.db');
     
     const offset = (page - 1) * limit;
 
