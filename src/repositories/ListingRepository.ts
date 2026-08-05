@@ -51,7 +51,7 @@ function rowToListing(row: ListingRow): BitmapListing {
     sellerPaymentAddress: row.seller_payment_address || undefined,
     unsignedPsbt: row.unsigned_psbt || undefined,
     signedPsbt: row.signed_psbt || undefined,
-    psbtStatus: (row.psbt_status as 'created' | 'signed' | 'sold' | 'expired') || undefined,
+    psbtStatus: (row.psbt_status as 'pending' | 'created' | 'signed' | 'sold' | 'expired') || undefined,
     etiquetas: row.etiquetas,
     totalTransacciones: row.totalTransacciones,
     hash: row.hash,
@@ -82,7 +82,7 @@ export class ListingRepository {
 
     const stmt = db.prepare(`
       INSERT INTO listings (id, inscription_id, name, description, price, seller_address, listed_at, image_url, is_active, bitmap_number, inscription_number, bitmap_hash, owner_address, seller_ordinal_public_key, seller_payment_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -206,7 +206,7 @@ export class ListingRepository {
     return this.findById(id)!;
   }
 
-  updatePsbtFields(id: string, fields: { unsignedPsbt?: string; signedPsbt?: string; psbtStatus?: string; price?: number; listedAt?: number }): void {
+  updatePsbtFields(id: string, fields: { unsignedPsbt?: string; signedPsbt?: string; psbtStatus?: string; price?: number; listedAt?: number; isActive?: boolean }): void {
     const db = getDb();
     const updates: string[] = [];
     const values: (string | number)[] = [];
@@ -231,11 +231,25 @@ export class ListingRepository {
       updates.push('listed_at = ?');
       values.push(fields.listedAt);
     }
+    if (fields.isActive !== undefined) {
+      updates.push('is_active = ?');
+      values.push(fields.isActive ? 1 : 0);
+    }
 
     if (updates.length === 0) return;
 
     values.push(id);
     db.prepare(`UPDATE listings SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  }
+
+  activate(id: string): void {
+    const db = getDb();
+    db.prepare('UPDATE listings SET is_active = 1 WHERE id = ?').run(id);
+  }
+
+  deactivate(id: string): void {
+    const db = getDb();
+    db.prepare('UPDATE listings SET is_active = 0 WHERE id = ?').run(id);
   }
 
   markAsSold(id: string, buyerAddress: string): void {

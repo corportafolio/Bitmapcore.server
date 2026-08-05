@@ -25,7 +25,7 @@ export interface BitmapListing {
   sellerPaymentAddress?: string;
   unsignedPsbt?: string;
   signedPsbt?: string;
-  psbtStatus?: 'created' | 'signed' | 'sold' | 'expired';
+  psbtStatus?: 'pending' | 'created' | 'signed' | 'sold' | 'expired';
 }
 
 export interface BitmapListingCreate {

@@ -58,7 +58,7 @@ export class BitmapService {
 
     this.listingRepo.updatePsbtFields(listing.id, {
       unsignedPsbt: psbtResult.unsignedPsbt,
-      psbtStatus: 'created',
+      psbtStatus: 'pending',
     });
 
     logger.info('Listing created with PSBT', { 
@@ -82,8 +82,8 @@ export class BitmapService {
       throw new NotFoundError('Listing not found');
     }
 
-    if (listing.psbtStatus !== 'created') {
-      throw new ValidationError(`Listing is not in 'created' state: ${listing.psbtStatus}`);
+    if (listing.psbtStatus !== 'pending') {
+      throw new ValidationError(`Listing is not in 'pending' state: ${listing.psbtStatus}`);
     }
 
     if (listing.sellerOrdinalPublicKey !== sellerOrdinalPublicKey) {
@@ -103,6 +103,7 @@ export class BitmapService {
     this.listingRepo.updatePsbtFields(listingId, {
       signedPsbt,
       psbtStatus: 'signed',
+      isActive: true,
     });
 
     logger.info('Listing signed and activated', { listingId });
@@ -152,7 +153,7 @@ export class BitmapService {
 
     this.listingRepo.updatePsbtFields(listingId, {
       unsignedPsbt: psbtResult.unsignedPsbt,
-      psbtStatus: 'created',
+      psbtStatus: 'pending',
     });
 
     logger.info('Price update PSBT generated', { listingId, newPrice });
@@ -175,8 +176,8 @@ export class BitmapService {
       throw new NotFoundError('Listing not found');
     }
 
-    if (listing.psbtStatus !== 'created') {
-      throw new ValidationError(`Listing is not in 'created' state: ${listing.psbtStatus}`);
+    if (listing.psbtStatus !== 'pending') {
+      throw new ValidationError(`Listing is not in 'pending' state: ${listing.psbtStatus}`);
     }
 
     if (listing.sellerOrdinalPublicKey !== sellerOrdinalPublicKey) {
@@ -354,7 +355,7 @@ export class BitmapService {
         this.listingRepo.updatePsbtFields(existing.id, {
           price: item.price,
           listedAt: Date.now(),
-          psbtStatus: 'created',
+          psbtStatus: 'pending',
         });
 
         listingIds.push(existing.id);
@@ -369,6 +370,10 @@ export class BitmapService {
       } else {
         if (existing && existing.isActive) {
           throw new ValidationError('Bitmap is already listed for sale');
+        }
+
+        if (existing && !existing.isActive) {
+          this.listingRepo.delete(existing.id);
         }
 
         const listing = this.listingRepo.create({
@@ -403,7 +408,7 @@ export class BitmapService {
     for (const id of listingIds) {
       this.listingRepo.updatePsbtFields(id, {
         unsignedPsbt: psbt.unsignedPsbt,
-        psbtStatus: 'created',
+        psbtStatus: 'pending',
       });
     }
 
@@ -426,8 +431,8 @@ export class BitmapService {
         throw new ValidationError(`Listing not found: ${listingId}`);
       }
 
-      if (listing.psbtStatus !== 'created') {
-        throw new ValidationError(`Listing is not in 'created' state: ${listing.psbtStatus}`);
+      if (listing.psbtStatus !== 'pending') {
+        throw new ValidationError(`Listing is not in 'pending' state: ${listing.psbtStatus}`);
       }
 
       if (listing.sellerOrdinalPublicKey !== sellerOrdinalPublicKey) {
@@ -449,6 +454,7 @@ export class BitmapService {
       this.listingRepo.updatePsbtFields(listingId, {
         signedPsbt,
         psbtStatus: 'signed',
+        isActive: true,
         ...(isPriceUpdate ? { listedAt: Date.now() } : {}),
       });
 
