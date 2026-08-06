@@ -363,6 +363,73 @@ export class PSBTService {
     }
   }
 
+  validateBatchSignedPSBT(psbtInput: string, listings: Array<{ sellerPaymentAddress: string; price: number }>): boolean {
+    try {
+      let psbt: bitcoin.Psbt;
+
+      const cleanInput = psbtInput.trim();
+
+      if (/^[0-9a-fA-F]+$/.test(cleanInput) && cleanInput.length % 2 === 0) {
+        const buf = Buffer.from(cleanInput, 'hex');
+        psbt = bitcoin.Psbt.fromBuffer(buf, { network: NETWORK });
+      } else {
+        psbt = bitcoin.Psbt.fromBase64(cleanInput, { network: NETWORK });
+      }
+
+      logger.info('Batch PSBT parsed', {
+        inputCount: psbt.data.inputs.length,
+        outputCount: psbt.data.outputs.length,
+        listingCount: listings.length,
+      });
+
+      if (psbt.data.outputs.length !== listings.length) {
+        logger.warn('Batch PSBT validation failed: output/listing count mismatch', {
+          outputs: psbt.data.outputs.length,
+          listings: listings.length,
+        });
+        return false;
+      }
+
+      for (let i = 0; i < listings.length; i++) {
+        const output = psbt.data.outputs[i] as any;
+        const listing = listings[i];
+
+        if (output.value !== undefined && output.value !== null) {
+          const actualValue = typeof output.value === 'bigint' ? Number(output.value) : output.value;
+          if (actualValue !== listing.price) {
+            logger.warn('Batch PSBT validation failed: price mismatch at output', {
+              index: i,
+              expected: listing.price,
+              actual: actualValue,
+            });
+            return false;
+          }
+        }
+
+        if (output.script) {
+          try {
+            const outputAddress = bitcoin.address.fromOutputScript(output.script, NETWORK);
+            if (outputAddress !== listing.sellerPaymentAddress) {
+              logger.warn('Batch PSBT validation failed: address mismatch at output', {
+                index: i,
+                expected: listing.sellerPaymentAddress,
+                actual: outputAddress,
+              });
+              return false;
+            }
+          } catch (addrErr: any) {
+            logger.warn('Could not decode output address at index', { index: i, msg: addrErr.message });
+          }
+        }
+      }
+
+      return true;
+    } catch (error: any) {
+      logger.error('Batch PSBT validation error', { message: error.message });
+      return false;
+    }
+  }
+
   private async fetchInscriptionUTXO(inscriptionId: string): Promise<InscriptionUTXO | null> {
     try {
       const response = await fetch(`${config.apis.ordinals.baseUrl}/inscription/${inscriptionId}`, {

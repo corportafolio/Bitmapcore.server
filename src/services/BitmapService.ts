@@ -424,6 +424,7 @@ export class BitmapService {
     logger.info('Signing batch listings', { count: listingIds.length });
 
     const results: BitmapListing[] = [];
+    const listingsForValidation: Array<{ sellerPaymentAddress: string; price: number }> = [];
 
     for (const listingId of listingIds) {
       const listing = this.listingRepo.findById(listingId);
@@ -439,15 +440,23 @@ export class BitmapService {
         throw new ValidationError('Public key does not match listing');
       }
 
-      const isValid = this.psbtService.validateSignedListingPSBT(
-        signedPsbt,
-        listing.sellerPaymentAddress!,
-        listing.price
-      );
+      listingsForValidation.push({
+        sellerPaymentAddress: listing.sellerPaymentAddress!,
+        price: listing.price,
+      });
+    }
 
-      if (!isValid) {
-        throw new ValidationError('Invalid PSBT signature');
-      }
+    const isValid = this.psbtService.validateBatchSignedPSBT(
+      signedPsbt,
+      listingsForValidation
+    );
+
+    if (!isValid) {
+      throw new ValidationError('Invalid PSBT signature: one or more outputs failed validation');
+    }
+
+    for (const listingId of listingIds) {
+      const listing = this.listingRepo.findById(listingId)!;
 
       const isPriceUpdate = listing.listedAt && listing.listedAt < Date.now() - 1000;
 
