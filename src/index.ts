@@ -2,7 +2,7 @@ import express, { Request, Response, Express } from 'express';
 import { config } from './config/environment';
 import { corsMiddleware } from './config/cors';
 import { securityHeaders } from './middleware/securityHeaders';
-import { generalLimiter, purchaseLimiter } from './middleware/rateLimiter';
+
 import { errorHandler } from './middleware/errorHandler';
 import apiRoutes from './routes/apiRoutes';
 import { initDb, closeDb } from './database/db';
@@ -16,13 +16,13 @@ app.use(corsMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(generalLimiter);
+
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ success: true, data: { status: 'ok', timestamp: Date.now() } });
 });
 
-app.use('/api', purchaseLimiter);
+
 app.use('/api/v1', apiRoutes);
 
 app.use(errorHandler);

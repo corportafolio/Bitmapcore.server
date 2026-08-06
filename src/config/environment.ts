@@ -27,12 +27,6 @@ export const config = {
     feeAddress: process.env.MARKETPLACE_FEE_ADDRESS || '',
   },
 
-  rateLimit: {
-    purchaseWindowMs: 60 * 1000,
-    purchaseMax: 5,
-    generalWindowMs: 60 * 1000,
-    generalMax: 10,
-  },
 
   transaction: {
     psbtExpirationMs: 5 * 60 * 1000,
