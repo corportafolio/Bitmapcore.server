@@ -4,6 +4,8 @@ export interface BitmapListing {
   name: string;
   description: string;
   price: number;
+  listedPrice?: number;
+  bitmapId?: string;
   sellerAddress: string;
   buyerAddress: string | null;
   listedAt: number;
@@ -31,6 +33,8 @@ export interface BitmapListing {
 export interface BitmapListingCreate {
   inscriptionId: string;
   price: number;
+  listedPrice?: number;
+  bitmapId?: string;
   sellerAddress: string;
   name: string;
   description?: string;

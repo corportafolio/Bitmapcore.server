@@ -37,6 +37,8 @@ function rowToListing(row: ListingRow): BitmapListing {
     name: row.name,
     description: row.description || '',
     price: row.price,
+    listedPrice: row.price,
+    bitmapId: row.id,
     sellerAddress: row.seller_address,
     buyerAddress: row.buyer_address,
     listedAt: row.listed_at,
