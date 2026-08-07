@@ -96,6 +96,19 @@ function runMigrations(database: Database.Database): void {
       expires_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS ventas_historial (
+      id TEXT PRIMARY KEY,
+      listing_id TEXT NOT NULL,
+      inscription_id TEXT NOT NULL,
+      bitmap_number INTEGER,
+      name TEXT,
+      price INTEGER NOT NULL,
+      buyer_address TEXT NOT NULL,
+      seller_address TEXT NOT NULL,
+      txid TEXT,
+      sold_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_listings_is_active ON listings(is_active);
     CREATE INDEX IF NOT EXISTS idx_listings_inscription_id ON listings(inscription_id);
     CREATE INDEX IF NOT EXISTS idx_listings_bitmap_number ON listings(bitmap_number);

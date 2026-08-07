@@ -265,6 +265,16 @@ export class ListingRepository {
     `).run(buyerAddress, now, id);
   }
 
+  insertVenta(listingId: string, inscriptionId: string, bitmapNumber: number | null, name: string | null, price: number, buyerAddress: string, sellerAddress: string, txid: string): void {
+    const db = getDb();
+    const id = uuidv4();
+    const now = Date.now();
+    db.prepare(`
+      INSERT INTO ventas_historial (id, listing_id, inscription_id, bitmap_number, name, price, buyer_address, seller_address, txid, sold_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, listingId, inscriptionId, bitmapNumber, name, price, buyerAddress, sellerAddress, txid, now);
+  }
+
   delete(id: string): void {
     const db = getDb();
     db.prepare('DELETE FROM listings WHERE id = ?').run(id);

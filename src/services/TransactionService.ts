@@ -120,6 +120,20 @@ export class TransactionService {
         this.transactionRepo.updateStatus(transactionId, 'BROADCASTED', rawTx);
         this.listingRepo.markAsSold(transaction.listingId, transaction.buyerAddress);
 
+        const listing = this.listingRepo.findById(transaction.listingId);
+        if (listing) {
+          this.listingRepo.insertVenta(
+            transaction.listingId,
+            listing.inscriptionId,
+            listing.bitmapNumber || null,
+            listing.name,
+            listing.price,
+            transaction.buyerAddress,
+            transaction.sellerAddress,
+            rawTx
+          );
+        }
+
         logger.info('Transaction broadcasted successfully', { transactionId, txid: rawTx });
 
         return { txid: rawTx, status: 'broadcasted' };
