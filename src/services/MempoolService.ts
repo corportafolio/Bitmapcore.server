@@ -114,24 +114,24 @@ export class MempoolService {
     }
   }
 
-  async broadcast(psbt: string): Promise<{ txid: string }> {
-    logger.info('Broadcasting transaction', { psbtLength: psbt.length });
+  async broadcast(rawTxHex: string): Promise<{ txid: string }> {
+    logger.info('Broadcasting raw transaction to mempool', { rawTxLength: rawTxHex.length });
 
     try {
       const response = await withTimeout<{ txid: string }>(
         axios.post<{ txid: string }>(
           `${this.baseUrl}/tx`,
-          `psbt=${encodeURIComponent(psbt)}`,
+          rawTxHex,
           {
             timeout: this.timeout,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            headers: { 'Content-Type': 'text/plain' }
           }
         ).then(res => res.data),
         this.timeout,
         'Mempool API broadcast'
       );
 
-      logger.info('Transaction broadcasted', { txid: response.txid });
+      logger.info('Mempool accepted transaction', { txid: response.txid });
 
       return { txid: response.txid };
     } catch (error) {
@@ -141,7 +141,7 @@ export class MempoolService {
           message: error.message,
           data: error.response?.data
         });
-        throw new ExternalApiError(`Failed to broadcast: ${error.message}`);
+        throw new ExternalApiError(`Failed to broadcast to mempool: ${error.response?.data || error.message}`);
       }
       throw error;
     }

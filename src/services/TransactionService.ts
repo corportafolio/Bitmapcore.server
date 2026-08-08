@@ -119,8 +119,11 @@ export class TransactionService {
     for (let attempt = 1; attempt <= config.transaction.maxRetryAttempts; attempt++) {
       try {
         const rawTx = await this.psbtService.finalizeAndBroadcast(signedPsbt);
-        
-        this.transactionRepo.updateStatus(transactionId, 'BROADCASTED', rawTx);
+
+        const broadcastResult = await this.mempoolService.broadcast(rawTx);
+        const txid = broadcastResult.txid;
+
+        this.transactionRepo.updateStatus(transactionId, 'BROADCASTED', txid);
         this.listingRepo.markAsSold(transaction.listingId, transaction.buyerAddress);
 
         const listing = this.listingRepo.findById(transaction.listingId);
@@ -133,13 +136,13 @@ export class TransactionService {
             listing.price,
             transaction.buyerAddress,
             transaction.sellerAddress,
-            rawTx
+            txid
           );
         }
 
-        logger.info('Transaction broadcasted successfully', { transactionId, txid: rawTx });
+        logger.info('Transaction accepted by mempool', { transactionId, txid });
 
-        return { txid: rawTx, status: 'broadcasted' };
+        return { txid, status: 'broadcasted' };
       } catch (error) {
         lastError = error as Error;
         logger.warn(`Broadcast attempt ${attempt} failed`, {
@@ -269,7 +272,10 @@ export class TransactionService {
       try {
         const rawTx = await this.psbtService.finalizeAndBroadcast(signedPsbt);
 
-        this.batchTxRepo.updateStatus(transactionId, 'BROADCASTED', rawTx);
+        const broadcastResult = await this.mempoolService.broadcast(rawTx);
+        const txid = broadcastResult.txid;
+
+        this.batchTxRepo.updateStatus(transactionId, 'BROADCASTED', txid);
 
         for (const listingId of batchTx.listingIds) {
           const listing = this.listingRepo.findById(listingId);
@@ -283,14 +289,14 @@ export class TransactionService {
               listing.price,
               batchTx.buyerAddress,
               listing.sellerAddress,
-              rawTx
+              txid
             );
           }
         }
 
-        logger.info('Batch transaction broadcasted', { transactionId, txid: rawTx, listingCount: batchTx.listingIds.length });
+        logger.info('Batch transaction accepted by mempool', { transactionId, txid, listingCount: batchTx.listingIds.length });
 
-        return { txid: rawTx, status: 'broadcasted' };
+        return { txid, status: 'broadcasted' };
       } catch (error) {
         lastError = error as Error;
         logger.warn(`Batch broadcast attempt ${attempt} failed`, { transactionId, error: lastError.message });
