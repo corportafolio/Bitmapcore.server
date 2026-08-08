@@ -5,6 +5,7 @@ import { ListingRepository } from '../repositories/ListingRepository';
 import { BatchTransactionRepository } from '../repositories/BatchTransactionRepository';
 import { MempoolService } from './MempoolService';
 import { PSBTService } from './PSBTService';
+import { AssetProxyService } from './AssetProxyService';
 import { PSBTCreate, TransactionStatusResponse } from '../types/transaction';
 import { config } from '../config/environment';
 import { logger } from '../utils/logger';
@@ -18,6 +19,7 @@ export class TransactionService {
   private batchTxRepo: BatchTransactionRepository;
   private mempoolService: MempoolService;
   private psbtService: PSBTService;
+  private assetService: AssetProxyService;
 
   constructor() {
     this.transactionRepo = new TransactionRepository();
@@ -26,6 +28,7 @@ export class TransactionService {
     this.batchTxRepo = new BatchTransactionRepository();
     this.mempoolService = new MempoolService();
     this.psbtService = new PSBTService();
+    this.assetService = new AssetProxyService();
   }
 
   async createPSBT(
@@ -59,12 +62,25 @@ export class TransactionService {
     }
 
     const buyerUtxos = await this.mempoolService.getUTXOs(buyerAddress);
-    
+
+    const inscribedOutputs = await this.assetService.getInscribedOutputIds(buyerAddress);
+    const cleanUtxos = buyerUtxos.filter(utxo => !inscribedOutputs.has(`${utxo.txid}:${utxo.vout}`.toLowerCase()));
+
+    logger.info('Buyer UTXOs after filtering inscribed outputs', {
+      total: buyerUtxos.length,
+      clean: cleanUtxos.length,
+      inscribedExcluded: buyerUtxos.length - cleanUtxos.length,
+    });
+
+    if (cleanUtxos.length === 0) {
+      throw new ValidationError('No hay saldo disponible para pagar: todos los UTXOs de esta wallet contienen activos. Recarga saldo en una dirección de pago sin inscripciones.');
+    }
+
     const completedResult = await this.psbtService.completePurchasePSBT(
       listing.signedPsbt,
       buyerAddress,
       listing.price,
-      buyerUtxos,
+      cleanUtxos,
       listing.sellerPaymentAddress!
     );
 
@@ -209,6 +225,19 @@ export class TransactionService {
 
     const buyerUtxos = await this.mempoolService.getUTXOs(buyerAddress);
 
+    const inscribedOutputs = await this.assetService.getInscribedOutputIds(buyerAddress);
+    const cleanUtxos = buyerUtxos.filter(utxo => !inscribedOutputs.has(`${utxo.txid}:${utxo.vout}`.toLowerCase()));
+
+    logger.info('Buyer UTXOs after filtering inscribed outputs', {
+      total: buyerUtxos.length,
+      clean: cleanUtxos.length,
+      inscribedExcluded: buyerUtxos.length - cleanUtxos.length,
+    });
+
+    if (cleanUtxos.length === 0) {
+      throw new ValidationError('No hay saldo disponible para pagar: todos los UTXOs de esta wallet contienen activos. Recarga saldo en una dirección de pago sin inscripciones.');
+    }
+
     const batchInputsWithPsbt = listings.map(l => ({
       signedPsbtBase64: l.signedPsbt!,
       price: l.price,
@@ -218,7 +247,7 @@ export class TransactionService {
     const completedResult = await this.psbtService.completeBatchPurchasePSBT(
       batchInputsWithPsbt,
       buyerAddress,
-      buyerUtxos
+      cleanUtxos
     );
 
     const expiresAt = Date.now() + config.transaction.psbtExpirationMs;

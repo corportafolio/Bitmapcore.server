@@ -252,7 +252,7 @@ export class PSBTService {
     }
 
     if (totalInputValue < totalNeeded) {
-      throw new ValidationError(`Insufficient funds: need ${totalNeeded} sat, have ${totalInputValue} sat`);
+      throw new ValidationError(`Saldo disponible insuficiente: se necesitan ${totalNeeded} sat, hay ${totalInputValue} sat. Los UTXOs con activos/inscripciones no se usan para pagar.`);
     }
 
     for (const utxo of selectedUtxos) {
@@ -557,7 +557,7 @@ export class PSBTService {
     }
 
     if (totalInputValue < totalNeeded) {
-      throw new ValidationError(`Saldo insuficiente: se necesitan ${totalNeeded} sat, hay ${totalInputValue} sat`);
+      throw new ValidationError(`Saldo disponible insuficiente: se necesitan ${totalNeeded} sat, hay ${totalInputValue} sat. Los UTXOs con activos/inscripciones no se usan para pagar.`);
     }
 
     for (const utxo of selectedUtxos) {

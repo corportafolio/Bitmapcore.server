@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
 import { AssetInscription, AssetCollection, UserAssetsResponse } from '../types/asset';
+import { ExternalApiError } from '../errors/AppError';
 
 const BITTICK_AGENT_IDS = new Set([
   "ef7563ebd206be7271685774b39eec7c188ff57f763e08b31e84732848c8101bi0",
@@ -156,6 +157,28 @@ export class AssetProxyService {
       collections,
       total: inscriptions.length
     };
+  }
+
+  async getInscribedOutputIds(address: string): Promise<Set<string>> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/address/${address}`, {
+        timeout: 15000,
+        headers: { 'User-Agent': UA, 'Accept': 'text/html' }
+      });
+      const html = typeof response.data === 'string' ? response.data : '';
+      const regex = /href=["']?\/output\/([^ "'>]+)/g;
+      const ids: string[] = [];
+      let match;
+      while ((match = regex.exec(html)) !== null) {
+        ids.push(match[1]);
+      }
+      const set = new Set(ids.map(o => o.toLowerCase()));
+      logger.info('Inscribed outputs fetched', { address, count: set.size });
+      return set;
+    } catch (error: any) {
+      logger.error('Failed to fetch inscribed outputs', { address, error: error.message });
+      throw new ExternalApiError(`No se pudo verificar el saldo disponible (inscripciones). Intente de nuevo.`);
+    }
   }
 
   private async fetchOutputIds(address: string): Promise<string[]> {
