@@ -159,26 +159,37 @@ export class AssetProxyService {
     };
   }
 
-  async getInscribedOutputIds(address: string): Promise<Set<string>> {
-    try {
-      const response = await axios.get(`${this.baseUrl}/address/${address}`, {
-        timeout: 15000,
-        headers: { 'User-Agent': UA, 'Accept': 'text/html' }
-      });
-      const html = typeof response.data === 'string' ? response.data : '';
-      const regex = /href=["']?\/output\/([^ "'>]+)/g;
-      const ids: string[] = [];
-      let match;
-      while ((match = regex.exec(html)) !== null) {
-        ids.push(match[1]);
-      }
-      const set = new Set(ids.map(o => o.toLowerCase()));
-      logger.info('Inscribed outputs fetched', { address, count: set.size });
-      return set;
-    } catch (error: any) {
-      logger.error('Failed to fetch inscribed outputs', { address, error: error.message });
-      throw new ExternalApiError(`No se pudo verificar el saldo disponible (inscripciones). Intente de nuevo.`);
+  private inscribedCache = new Map<string, { ts: number; set: Set<string> }>();
+
+  async getInscribedOutputIds(address: string, utxos: Array<{ txid: string; vout: number }>): Promise<Set<string>> {
+    const cacheKey = address.toLowerCase();
+    const cached = this.inscribedCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < 60000) {
+      logger.info('Inscribed outputs cache hit', { address, count: cached.set.size });
+      return cached.set;
     }
+
+    const outputIds = utxos.map(u => `${u.txid}:${u.vout}`);
+    const results = await limitConcurrency(outputIds, 10, async (outputId: string) => {
+      const ids = await this.fetchInscriptionIdsFromOutputStrict(outputId);
+      return { outputId, hasInscriptions: ids.length > 0 };
+    });
+
+    const inscribed = new Set<string>();
+    let failures = 0;
+    for (const r of results) {
+      if (!r) { failures++; continue; }
+      if (r.hasInscriptions) inscribed.add(r.outputId.toLowerCase());
+    }
+
+    if (failures > 0) {
+      logger.error('Inscribed outputs verification failed', { address, failures, total: outputIds.length });
+      throw new ExternalApiError(`No se pudo verificar el saldo disponible (${failures} outputs sin verificar). Intente de nuevo.`);
+    }
+
+    this.inscribedCache.set(cacheKey, { ts: Date.now(), set: inscribed });
+    logger.info('Inscribed outputs verified per-UTXO', { address, total: outputIds.length, inscribed: inscribed.size });
+    return inscribed;
   }
 
   private async fetchOutputIds(address: string): Promise<string[]> {
@@ -219,6 +230,21 @@ export class AssetProxyService {
       logger.error('Failed to fetch output page', { outputId, error: error.message });
       return [];
     }
+  }
+
+  private async fetchInscriptionIdsFromOutputStrict(outputId: string): Promise<string[]> {
+    const response = await axios.get(`${this.baseUrl}/output/${outputId}`, {
+      timeout: 15000,
+      headers: { 'User-Agent': UA, 'Accept': 'text/html' }
+    });
+    const html = typeof response.data === 'string' ? response.data : '';
+    const regex = /\/inscription\/([a-f0-9]{64}i\d+)/g;
+    const ids: string[] = [];
+    let match;
+    while ((match = regex.exec(html)) !== null) {
+      ids.push(match[1]);
+    }
+    return [...new Set(ids)];
   }
 
   private async processInscriptions(inscriptionIds: string[], address: string): Promise<AssetInscription[]> {

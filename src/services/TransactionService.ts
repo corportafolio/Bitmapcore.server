@@ -63,7 +63,7 @@ export class TransactionService {
 
     const buyerUtxos = await this.mempoolService.getUTXOs(buyerAddress);
 
-    const inscribedOutputs = await this.assetService.getInscribedOutputIds(buyerAddress);
+    const inscribedOutputs = await this.assetService.getInscribedOutputIds(buyerAddress, buyerUtxos);
     const cleanUtxos = buyerUtxos.filter(utxo => !inscribedOutputs.has(`${utxo.txid}:${utxo.vout}`.toLowerCase()));
 
     logger.info('Buyer UTXOs after filtering inscribed outputs', {
@@ -225,7 +225,7 @@ export class TransactionService {
 
     const buyerUtxos = await this.mempoolService.getUTXOs(buyerAddress);
 
-    const inscribedOutputs = await this.assetService.getInscribedOutputIds(buyerAddress);
+    const inscribedOutputs = await this.assetService.getInscribedOutputIds(buyerAddress, buyerUtxos);
     const cleanUtxos = buyerUtxos.filter(utxo => !inscribedOutputs.has(`${utxo.txid}:${utxo.vout}`.toLowerCase()));
 
     logger.info('Buyer UTXOs after filtering inscribed outputs', {
