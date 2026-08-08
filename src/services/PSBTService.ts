@@ -10,7 +10,7 @@ const ECPair = ecpair.ECPairFactory(tinysecp);
 
 const NETWORK = bitcoin.networks.bitcoin;
 const DUST_LIMIT = 546n;
-const MARKETPLACE_FEE_PERCENT = 1;
+const MARKETPLACE_FEE_PERCENT = config.marketplace.feePercent || 2;
 
 export interface InscriptionUTXO {
   txid: string;
@@ -501,6 +501,9 @@ export class PSBTService {
       }
       if (inputData.tapScriptSig && inputData.tapScriptSig.length > 0) {
         (psbt.data.inputs[inputIdx] as any).tapScriptSig = inputData.tapScriptSig.map((ts: any) => ({ pubkey: ts.pubkey, leafHash: ts.leafHash, signature: ts.signature }));
+      }
+      if (inputData.tapKeySig) {
+        (psbt.data.inputs[inputIdx] as any).tapKeySig = inputData.tapKeySig;
       }
 
       psbt.addOutput({

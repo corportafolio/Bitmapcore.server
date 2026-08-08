@@ -38,12 +38,12 @@ export function validateBody(schema: ZodSchema) {
 export const buyBitmapSchema = z.object({
   bitmapId: z.string().uuid(),
   buyerAddress: z.string().min(26).max(62),
-  idempotencyKey: z.string().uuid(),
+  idempotencyKey: z.string().min(1).max(100),
 });
 
 export const broadcastSchema = z.object({
   signedPsbt: z.string().min(20),
-  transactionId: z.string().uuid(),
+  transactionId: z.string().min(1),
 });
 
 export const createListingSchema = z.object({
@@ -112,7 +112,7 @@ export const batchSignSchema = z.object({
 export const batchBuySchema = z.object({
   bitmapIds: z.array(z.string().uuid()).min(1).max(500),
   buyerAddress: z.string().min(26).max(62),
-  idempotencyKey: z.string().uuid(),
+  idempotencyKey: z.string().min(1).max(100),
 });
 
 export const batchBroadcastSchema = z.object({
