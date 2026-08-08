@@ -81,6 +81,7 @@ export class PSBTService {
         value: BigInt(inscriptionUtxo.value),
       },
       tapInternalKey: this.pubkeyToXOnly(sellerOrdinalPublicKey),
+      sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
     });
 
     psbt.addOutput({
@@ -135,6 +136,7 @@ export class PSBTService {
         value: BigInt(inscriptionUtxo.value),
       },
       tapInternalKey: this.pubkeyToXOnly(sellerOrdinalPublicKey),
+      sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
     });
 
     psbt.addOutput({
@@ -180,6 +182,7 @@ export class PSBTService {
           value: BigInt(input.value),
         },
         tapInternalKey: input.tapInternalKey,
+        sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
       });
 
       psbt.addOutput({
@@ -214,7 +217,26 @@ export class PSBTService {
       utxoCount: buyerUtxos.length 
     });
 
-    const psbt = bitcoin.Psbt.fromBase64(signedListingPsbtBase64, { network: NETWORK });
+    const sellerPsbt = bitcoin.Psbt.fromBase64(signedListingPsbtBase64, { network: NETWORK });
+
+    const sellerTxInput = sellerPsbt.txInputs[0];
+    const sellerTxOutput = sellerPsbt.txOutputs[0];
+    const sellerInputData = sellerPsbt.data.inputs[0];
+
+    const psbt = new bitcoin.Psbt({ network: NETWORK });
+
+    psbt.addInput({
+      hash: sellerTxInput.hash,
+      index: sellerTxInput.index,
+      witnessUtxo: sellerInputData.witnessUtxo,
+      tapInternalKey: sellerInputData.tapInternalKey,
+      sighashType: sellerInputData.sighashType !== undefined ? sellerInputData.sighashType : bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+    });
+
+    psbt.addOutput({
+      script: sellerTxOutput.script,
+      value: sellerTxOutput.value,
+    });
 
     const marketplaceFee = Math.floor(price * MARKETPLACE_FEE_PERCENT / 100);
     const totalNeeded = BigInt(price) + BigInt(marketplaceFee) + DUST_LIMIT;
@@ -245,11 +267,6 @@ export class PSBTService {
     }
 
     psbt.addOutput({
-      address: sellerPaymentAddress,
-      value: BigInt(price),
-    });
-
-    psbt.addOutput({
       address: config.marketplace.feeAddress || sellerPaymentAddress,
       value: BigInt(marketplaceFee),
     });
@@ -260,6 +277,16 @@ export class PSBTService {
         address: buyerAddress,
         value: changeValue,
       });
+    }
+
+    if (sellerInputData.partialSig && sellerInputData.partialSig.length > 0) {
+      (psbt.data.inputs[0] as any).partialSig = sellerInputData.partialSig.map((ps: any) => ({ pubkey: ps.pubkey, signature: ps.signature }));
+    }
+    if (sellerInputData.tapScriptSig && sellerInputData.tapScriptSig.length > 0) {
+      (psbt.data.inputs[0] as any).tapScriptSig = sellerInputData.tapScriptSig.map((ts: any) => ({ pubkey: ts.pubkey, leafHash: ts.leafHash, signature: ts.signature }));
+    }
+    if (sellerInputData.tapKeySig) {
+      (psbt.data.inputs[0] as any).tapKeySig = sellerInputData.tapKeySig;
     }
 
     const transactionId = this.generateTransactionId();
@@ -480,6 +507,8 @@ export class PSBTService {
     let totalPrice = 0;
     let totalFee = 0;
 
+    const sellerSigs: Array<{ partialSig: any[]; tapScriptSig: any[]; tapKeySig: any }> = [];
+
     for (const listing of listings) {
       const sellerPsbt = bitcoin.Psbt.fromBase64(listing.signedPsbtBase64, { network: NETWORK });
 
@@ -487,28 +516,23 @@ export class PSBTService {
       const txOutput = sellerPsbt.txOutputs[0];
       const inputData = sellerPsbt.data.inputs[0];
 
-      const inputIdx = psbt.data.inputs.length;
-
       psbt.addInput({
         hash: txInput.hash,
         index: txInput.index,
         witnessUtxo: inputData.witnessUtxo,
         tapInternalKey: inputData.tapInternalKey,
+        sighashType: inputData.sighashType !== undefined ? inputData.sighashType : bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
       });
-
-      if (inputData.partialSig && inputData.partialSig.length > 0) {
-        (psbt.data.inputs[inputIdx] as any).partialSig = inputData.partialSig.map((ps: any) => ({ pubkey: ps.pubkey, signature: ps.signature }));
-      }
-      if (inputData.tapScriptSig && inputData.tapScriptSig.length > 0) {
-        (psbt.data.inputs[inputIdx] as any).tapScriptSig = inputData.tapScriptSig.map((ts: any) => ({ pubkey: ts.pubkey, leafHash: ts.leafHash, signature: ts.signature }));
-      }
-      if (inputData.tapKeySig) {
-        (psbt.data.inputs[inputIdx] as any).tapKeySig = inputData.tapKeySig;
-      }
 
       psbt.addOutput({
         script: txOutput.script,
         value: txOutput.value,
+      });
+
+      sellerSigs.push({
+        partialSig: inputData.partialSig || [],
+        tapScriptSig: inputData.tapScriptSig || [],
+        tapKeySig: inputData.tapKeySig || null,
       });
 
       totalPrice += listing.price;
@@ -553,6 +577,19 @@ export class PSBTService {
         address: buyerAddress,
         value: changeValue,
       });
+    }
+
+    for (let i = 0; i < sellerSigs.length; i++) {
+      const sigs = sellerSigs[i];
+      if (sigs.partialSig.length > 0) {
+        (psbt.data.inputs[i] as any).partialSig = sigs.partialSig.map((ps: any) => ({ pubkey: ps.pubkey, signature: ps.signature }));
+      }
+      if (sigs.tapScriptSig.length > 0) {
+        (psbt.data.inputs[i] as any).tapScriptSig = sigs.tapScriptSig.map((ts: any) => ({ pubkey: ts.pubkey, leafHash: ts.leafHash, signature: ts.signature }));
+      }
+      if (sigs.tapKeySig) {
+        (psbt.data.inputs[i] as any).tapKeySig = sigs.tapKeySig;
+      }
     }
 
     const completedPsbtBase64 = psbt.toBase64();
