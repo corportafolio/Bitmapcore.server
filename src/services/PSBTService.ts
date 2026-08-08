@@ -464,6 +464,113 @@ export class PSBTService {
     }
   }
 
+  async completeBatchPurchasePSBT(
+    listings: Array<{ signedPsbtBase64: string; price: number; sellerPaymentAddress: string }>,
+    buyerAddress: string,
+    buyerUtxos: UTXO[]
+  ): Promise<{ psbt: string; marketplaceFee: number; changeValue: number; buyerInputs: Array<{ txid: string; vout: number; value: number }> }> {
+    logger.info('Completing batch purchase PSBT', {
+      listingCount: listings.length,
+      buyerAddress,
+      utxoCount: buyerUtxos.length,
+    });
+
+    const psbt = new bitcoin.Psbt({ network: NETWORK });
+
+    let totalPrice = 0;
+    let totalFee = 0;
+
+    for (const listing of listings) {
+      const sellerPsbt = bitcoin.Psbt.fromBase64(listing.signedPsbtBase64, { network: NETWORK });
+
+      const txInput = sellerPsbt.txInputs[0];
+      const txOutput = sellerPsbt.txOutputs[0];
+      const inputData = sellerPsbt.data.inputs[0];
+
+      const inputIdx = psbt.data.inputs.length;
+
+      psbt.addInput({
+        hash: txInput.hash,
+        index: txInput.index,
+        witnessUtxo: inputData.witnessUtxo,
+        tapInternalKey: inputData.tapInternalKey,
+      });
+
+      if (inputData.partialSig && inputData.partialSig.length > 0) {
+        (psbt.data.inputs[inputIdx] as any).partialSig = inputData.partialSig.map((ps: any) => ({ pubkey: ps.pubkey, signature: ps.signature }));
+      }
+      if (inputData.tapScriptSig && inputData.tapScriptSig.length > 0) {
+        (psbt.data.inputs[inputIdx] as any).tapScriptSig = inputData.tapScriptSig.map((ts: any) => ({ pubkey: ts.pubkey, leafHash: ts.leafHash, signature: ts.signature }));
+      }
+
+      psbt.addOutput({
+        script: txOutput.script,
+        value: txOutput.value,
+      });
+
+      totalPrice += listing.price;
+      totalFee += Math.floor(listing.price * MARKETPLACE_FEE_PERCENT / 100);
+    }
+
+    psbt.addOutput({
+      address: config.marketplace.feeAddress || listings[0].sellerPaymentAddress,
+      value: BigInt(totalFee),
+    });
+
+    const totalNeeded = BigInt(totalPrice) + BigInt(totalFee) + DUST_LIMIT;
+
+    let selectedUtxos: UTXO[] = [];
+    let totalInputValue = 0n;
+
+    for (const utxo of buyerUtxos) {
+      if (!utxo.status.confirmed) continue;
+      selectedUtxos.push(utxo);
+      totalInputValue += BigInt(utxo.value);
+      if (totalInputValue >= totalNeeded) break;
+    }
+
+    if (totalInputValue < totalNeeded) {
+      throw new ValidationError(`Saldo insuficiente: se necesitan ${totalNeeded} sat, hay ${totalInputValue} sat`);
+    }
+
+    for (const utxo of selectedUtxos) {
+      psbt.addInput({
+        hash: utxo.txid,
+        index: utxo.vout,
+        witnessUtxo: {
+          script: bitcoin.address.toOutputScript(buyerAddress, NETWORK),
+          value: BigInt(utxo.value),
+        },
+      });
+    }
+
+    const changeValue = totalInputValue - totalNeeded;
+    if (changeValue > DUST_LIMIT) {
+      psbt.addOutput({
+        address: buyerAddress,
+        value: changeValue,
+      });
+    }
+
+    const completedPsbtBase64 = psbt.toBase64();
+
+    logger.info('Batch purchase PSBT completed', {
+      listingCount: listings.length,
+      buyerInputs: selectedUtxos.length,
+      totalPrice,
+      marketplaceFee: totalFee,
+      changeValue: changeValue.toString(),
+      psbtLength: completedPsbtBase64.length,
+    });
+
+    return {
+      psbt: completedPsbtBase64,
+      marketplaceFee: totalFee,
+      changeValue: Number(changeValue),
+      buyerInputs: selectedUtxos.map(u => ({ txid: u.txid, vout: u.vout, value: u.value })),
+    };
+  }
+
   public pubkeyToXOnly(pubkey: string): Buffer {
     const pubkeyBuffer = Buffer.from(pubkey, 'hex');
     if (pubkeyBuffer.length === 32) {

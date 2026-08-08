@@ -108,3 +108,14 @@ export const batchSignSchema = z.object({
   signedPsbt: z.string().min(20),
   sellerOrdinalPublicKey: z.string().min(64).max(130),
 });
+
+export const batchBuySchema = z.object({
+  bitmapIds: z.array(z.string().uuid()).min(1).max(500),
+  buyerAddress: z.string().min(26).max(62),
+  idempotencyKey: z.string().uuid(),
+});
+
+export const batchBroadcastSchema = z.object({
+  signedPsbt: z.string().min(20),
+  transactionId: z.string().min(1),
+});

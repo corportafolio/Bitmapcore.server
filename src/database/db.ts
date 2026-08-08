@@ -96,6 +96,20 @@ function runMigrations(database: Database.Database): void {
       expires_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS batch_transactions (
+      id TEXT PRIMARY KEY,
+      buyer_address TEXT NOT NULL,
+      psbt TEXT,
+      status TEXT DEFAULT 'PENDING',
+      listing_ids TEXT NOT NULL,
+      total_price INTEGER NOT NULL,
+      marketplace_fee INTEGER NOT NULL,
+      txid TEXT,
+      error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS ventas_historial (
       id TEXT PRIMARY KEY,
       listing_id TEXT NOT NULL,
@@ -117,6 +131,7 @@ function runMigrations(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
     CREATE INDEX IF NOT EXISTS idx_transactions_idempotency_key ON transactions(idempotency_key);
     CREATE INDEX IF NOT EXISTS idx_idempotency_expires ON idempotency_keys(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_batch_tx_status ON batch_transactions(status);
   `);
 
   runPsbtMigrations(database);
