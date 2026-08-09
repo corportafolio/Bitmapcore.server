@@ -481,6 +481,70 @@ export class PSBTService {
     }
   }
 
+  validateSignaturePresence(psbtInput: string, expectedInputCount: number): { valid: boolean; details: string } {
+    try {
+      let psbt: bitcoin.Psbt;
+      const cleanInput = psbtInput.trim();
+      if (/^[0-9a-fA-F]+$/.test(cleanInput) && cleanInput.length % 2 === 0) {
+        const buf = Buffer.from(cleanInput, 'hex');
+        psbt = bitcoin.Psbt.fromBuffer(buf, { network: NETWORK });
+      } else {
+        psbt = bitcoin.Psbt.fromBase64(cleanInput, { network: NETWORK });
+      }
+
+      const inputCount = psbt.data.inputs.length;
+
+      if (inputCount !== expectedInputCount) {
+        const msg = `Input count mismatch: expected ${expectedInputCount}, got ${inputCount}`;
+        logger.warn('Signature validation failed', { msg });
+        return { valid: false, details: msg };
+      }
+
+      const missingInputs: number[] = [];
+      const inputDetails: string[] = [];
+
+      for (let i = 0; i < inputCount; i++) {
+        const input = psbt.data.inputs[i];
+        const hasTapKeySig = !!(input.tapKeySig && input.tapKeySig.length > 0);
+        const hasPartialSig = !!(input.partialSig && input.partialSig.length > 0);
+        const hasTapScriptSig = !!(input.tapScriptSig && input.tapScriptSig.length > 0);
+        const hasAnySig = hasTapKeySig || hasPartialSig || hasTapScriptSig;
+
+        if (!hasAnySig) {
+          missingInputs.push(i);
+          inputDetails.push(`input #${i}: NO SIGNATURE (tapKeySig=${hasTapKeySig}, partialSig=${hasPartialSig}, tapScriptSig=${hasTapScriptSig})`);
+        } else {
+          inputDetails.push(`input #${i}: OK (tapKeySig=${hasTapKeySig}, partialSig=${hasPartialSig}, tapScriptSig=${hasTapScriptSig})`);
+        }
+      }
+
+      const signedCount = inputCount - missingInputs.length;
+
+      logger.info('Signature verification results', {
+        inputCount,
+        signedCount,
+        missingCount: missingInputs.length,
+        missingInputs: missingInputs.length > 0 ? missingInputs : undefined,
+      });
+
+      for (const detail of inputDetails) {
+        logger.info('Signature detail', { detail });
+      }
+
+      if (missingInputs.length > 0) {
+        const msg = `Firma incompleta: ${missingInputs.length} de ${inputCount} inputs sin firma válida (inputs: [${missingInputs.join(', ')}]). Unisat puede haber firmado con SIGHASH incorrecto.`;
+        logger.error('REJECTED: PSBT with missing signatures', { msg, missingInputs });
+        return { valid: false, details: msg };
+      }
+
+      logger.info('All inputs have valid signatures', { inputCount });
+      return { valid: true, details: `All ${inputCount} inputs have signatures` };
+    } catch (error: any) {
+      logger.error('Signature presence validation error', { message: error.message });
+      return { valid: false, details: `Error parsing PSBT: ${error.message}` };
+    }
+  }
+
   private async fetchInscriptionUTXO(inscriptionId: string): Promise<InscriptionUTXO | null> {
     try {
       const response = await fetch(`${config.apis.ordinals.baseUrl}/inscription/${inscriptionId}`, {
@@ -615,6 +679,15 @@ export class PSBTService {
         (psbt.data.inputs[i] as any).tapKeySig = sigs.tapKeySig;
       }
     }
+
+    const restoredCount = sellerSigs.filter(s => s.tapKeySig || s.partialSig.length > 0 || s.tapScriptSig.length > 0).length;
+    const missingCount = sellerSigs.filter(s => !s.tapKeySig && s.partialSig.length === 0 && s.tapScriptSig.length === 0).length;
+    logger.info('Seller signatures restored', {
+      total: sellerSigs.length,
+      restoredCount,
+      missingCount,
+      missingIndices: missingCount > 0 ? sellerSigs.map((s, i) => (!s.tapKeySig && s.partialSig.length === 0 && s.tapScriptSig.length === 0) ? i : -1).filter(i => i >= 0) : undefined,
+    });
 
     const completedPsbtBase64 = psbt.toBase64();
 

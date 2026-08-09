@@ -460,6 +460,11 @@ export class BitmapService {
       throw new ValidationError('Invalid PSBT signature: one or more outputs failed validation');
     }
 
+    const sigCheck = this.psbtService.validateSignaturePresence(signedPsbt, listingIds.length);
+    if (!sigCheck.valid) {
+      throw new ValidationError(sigCheck.details);
+    }
+
     for (let i = 0; i < listingIds.length; i++) {
       const listingId = listingIds[i];
       const listing = this.listingRepo.findById(listingId)!;
