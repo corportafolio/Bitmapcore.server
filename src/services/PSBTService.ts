@@ -323,7 +323,7 @@ export class PSBTService {
     } else {
       psbt = bitcoin.Psbt.fromBase64(cleanInput, { network: NETWORK });
     }
-    
+
     psbt.finalizeAllInputs();
     const tx = psbt.extractTransaction();
     const rawTx = tx.toHex();
@@ -331,6 +331,31 @@ export class PSBTService {
     logger.info('Transaction finalized', { txid: tx.getId(), rawTxLength: rawTx.length });
 
     return rawTx;
+  }
+
+  restoreSellerTapSigs(signedPsbtHex: string, batchMappings: Array<{ batchPsbtBase64: string; psbtIndex: number; inputIndex: number }>): string {
+    const buyerPsbt = bitcoin.Psbt.fromBuffer(Buffer.from(signedPsbtHex, 'hex'), { network: NETWORK });
+
+    for (const mapping of batchMappings) {
+      try {
+        const sellerPsbt = bitcoin.Psbt.fromBase64(mapping.batchPsbtBase64, { network: NETWORK });
+        const sellerInput = sellerPsbt.data.inputs[mapping.psbtIndex];
+
+        if (sellerInput.tapKeySig) {
+          (buyerPsbt.data.inputs[mapping.inputIndex] as any).tapKeySig = sellerInput.tapKeySig;
+        }
+        if (sellerInput.tapScriptSig && sellerInput.tapScriptSig.length > 0) {
+          (buyerPsbt.data.inputs[mapping.inputIndex] as any).tapScriptSig = sellerInput.tapScriptSig;
+        }
+        if (sellerInput.partialSig && sellerInput.partialSig.length > 0) {
+          (buyerPsbt.data.inputs[mapping.inputIndex] as any).partialSig = sellerInput.partialSig;
+        }
+      } catch (e: any) {
+        logger.warn('Failed to restore seller tap sig', { inputIndex: mapping.inputIndex, error: e.message });
+      }
+    }
+
+    return buyerPsbt.toBuffer().toString('hex');
   }
 
   validateSignedListingPSBT(psbtInput: string, expectedSellerPaymentAddress: string, expectedPrice: number): boolean {

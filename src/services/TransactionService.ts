@@ -306,10 +306,27 @@ export class TransactionService {
 
     this.batchTxRepo.updateStatus(transactionId, 'AWAITING_BROADCAST');
 
+    const batchMappings: Array<{ batchPsbtBase64: string; psbtIndex: number; inputIndex: number }> = [];
+    for (let i = 0; i < batchTx.listingIds.length; i++) {
+      const mapping = this.listingRepo.getBatchMapping(batchTx.listingIds[i]);
+      if (mapping) {
+        batchMappings.push({
+          batchPsbtBase64: mapping.batchPsbt,
+          psbtIndex: mapping.psbtIndex,
+          inputIndex: i,
+        });
+      }
+    }
+
+    let restoredPsbt = signedPsbt;
+    if (batchMappings.length > 0) {
+      restoredPsbt = this.psbtService.restoreSellerTapSigs(signedPsbt, batchMappings);
+    }
+
     let lastError: Error | null = null;
     for (let attempt = 1; attempt <= config.transaction.maxRetryAttempts; attempt++) {
       try {
-        const rawTx = await this.psbtService.finalizeAndBroadcast(signedPsbt);
+        const rawTx = await this.psbtService.finalizeAndBroadcast(restoredPsbt);
 
         const broadcastResult = await this.mempoolService.broadcast(rawTx);
         const txid = broadcastResult.txid;
