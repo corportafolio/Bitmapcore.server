@@ -355,7 +355,7 @@ export class PSBTService {
       }
     }
 
-    return buyerPsbt.toBuffer().toString('hex');
+    return buyerPsbt.toBase64();
   }
 
   validateSignedListingPSBT(psbtInput: string, expectedSellerPaymentAddress: string, expectedPrice: number): boolean {
