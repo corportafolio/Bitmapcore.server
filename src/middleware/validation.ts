@@ -105,7 +105,7 @@ export const batchListSchema = z.object({
 
 export const batchSignSchema = z.object({
   listingIds: z.array(z.string().uuid()).min(1),
-  signedPsbt: z.string().min(20),
+  signedPsbtHexs: z.array(z.string().min(20)).min(1),
   sellerOrdinalPublicKey: z.string().min(64).max(130),
 });
 

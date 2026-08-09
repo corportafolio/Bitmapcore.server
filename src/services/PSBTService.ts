@@ -169,7 +169,7 @@ export class PSBTService {
     sellerPaymentAddress: string;
     price: number;
   }>): Promise<{ unsignedPsbt: string }> {
-    logger.info('Creating batch listing PSBT', { inputCount: inputs.length });
+    logger.info('Creating batch listing PSBT (single combined)', { inputCount: inputs.length });
 
     const psbt = new bitcoin.Psbt({ network: NETWORK });
 
@@ -196,12 +196,51 @@ export class PSBTService {
     logger.info('Batch listing PSBT created', {
       psbtLength: unsignedPsbtBase64.length,
       inputCount: psbt.data.inputs.length,
-      outputCount: psbt.data.outputs.length,
+      outputCount: psbt.txOutputs.length,
     });
 
     return {
       unsignedPsbt: unsignedPsbtBase64,
     };
+  }
+
+  createSeparateListingPSBTs(inputs: Array<{
+    txid: string;
+    vout: number;
+    value: number;
+    tapInternalKey: Buffer;
+    sellerPaymentAddress: string;
+    price: number;
+  }>): string[] {
+    logger.info('Creating separate listing PSBTs', { count: inputs.length });
+
+    const psbtHexs: string[] = [];
+
+    for (let i = 0; i < inputs.length; i++) {
+      const input = inputs[i];
+      const psbt = new bitcoin.Psbt({ network: NETWORK });
+
+      psbt.addInput({
+        hash: input.txid,
+        index: input.vout,
+        witnessUtxo: {
+          script: bitcoin.address.toOutputScript(input.sellerPaymentAddress, NETWORK),
+          value: BigInt(input.value),
+        },
+        tapInternalKey: input.tapInternalKey,
+        sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+      });
+
+      psbt.addOutput({
+        address: input.sellerPaymentAddress,
+        value: BigInt(input.price),
+      });
+
+      psbtHexs.push(psbt.toHex());
+    }
+
+    logger.info('Separate listing PSBTs created', { count: psbtHexs.length });
+    return psbtHexs;
   }
 
   async completePurchasePSBT(

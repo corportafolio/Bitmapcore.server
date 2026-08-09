@@ -18,8 +18,8 @@ router.post('/batch', validateBody(batchListSchema), async (req: Request, res: R
 
 router.post('/batch/sign', validateBody(batchSignSchema), async (req: Request, res: Response, next) => {
   try {
-    const { listingIds, signedPsbt, sellerOrdinalPublicKey } = req.body;
-    const result = await bitmapService.signBatchListings(listingIds, signedPsbt, sellerOrdinalPublicKey);
+    const { listingIds, signedPsbtHexs, sellerOrdinalPublicKey } = req.body;
+    const result = await bitmapService.signBatchListings(listingIds, signedPsbtHexs, sellerOrdinalPublicKey);
     sendSuccess(res, result);
   } catch (err) { next(err); }
 });

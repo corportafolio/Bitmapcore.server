@@ -307,7 +307,7 @@ export class BitmapService {
     inscriptionContentType: string;
     inscriptionHeight: number;
     isPriceUpdate: boolean;
-  }>): Promise<{ listingIds: string[]; psbtToSign: string }> {
+  }>): Promise<{ listingIds: string[]; psbtToSigns: Array<{ listingId: string; unsignedPsbtHex: string }> }> {
     logger.info('Creating batch listing', { count: items.length });
 
     const listingIds: string[] = [];
@@ -408,30 +408,39 @@ export class BitmapService {
       }
     }
 
-    const psbt = await this.psbtService.createBatchListingPSBT(psbtInputs);
+    const psbtHexs = this.psbtService.createSeparateListingPSBTs(psbtInputs);
 
-    for (const id of listingIds) {
+    const psbtToSigns: Array<{ listingId: string; unsignedPsbtHex: string }> = [];
+    for (let i = 0; i < listingIds.length; i++) {
+      const id = listingIds[i];
       this.listingRepo.updatePsbtFields(id, {
-        unsignedPsbt: psbt.unsignedPsbt,
+        unsignedPsbt: psbtHexs[i],
         psbtStatus: 'pending',
       });
+      psbtToSigns.push({ listingId: id, unsignedPsbtHex: psbtHexs[i] });
     }
 
     await this.triggerLocalMarketplaceRefresh();
 
     return {
       listingIds,
-      psbtToSign: psbt.unsignedPsbt,
+      psbtToSigns,
     };
   }
 
-  async signBatchListings(listingIds: string[], signedPsbt: string, sellerOrdinalPublicKey: string): Promise<BitmapListing[]> {
-    logger.info('Signing batch listings', { count: listingIds.length });
+  async signBatchListings(listingIds: string[], signedPsbtHexs: string[], sellerOrdinalPublicKey: string): Promise<BitmapListing[]> {
+    logger.info('Signing batch listings', { count: listingIds.length, signedCount: signedPsbtHexs.length });
+
+    if (listingIds.length !== signedPsbtHexs.length) {
+      throw new ValidationError(`Mismatch: ${listingIds.length} listings but ${signedPsbtHexs.length} signed PSBTs`);
+    }
 
     const results: BitmapListing[] = [];
-    const listingsForValidation: Array<{ sellerPaymentAddress: string; price: number }> = [];
 
-    for (const listingId of listingIds) {
+    for (let i = 0; i < listingIds.length; i++) {
+      const listingId = listingIds[i];
+      const signedPsbtHex = signedPsbtHexs[i];
+
       const listing = this.listingRepo.findById(listingId);
       if (!listing) {
         throw new ValidationError(`Listing not found: ${listingId}`);
@@ -445,44 +454,27 @@ export class BitmapService {
         throw new ValidationError('Public key does not match listing');
       }
 
-      listingsForValidation.push({
-        sellerPaymentAddress: listing.sellerPaymentAddress!,
-        price: listing.price,
-      });
-    }
-
-    const isValid = this.psbtService.validateBatchSignedPSBT(
-      signedPsbt,
-      listingsForValidation
-    );
-
-    if (!isValid) {
-      throw new ValidationError('Invalid PSBT signature: one or more outputs failed validation');
-    }
-
-    const sigCheck = this.psbtService.validateSignaturePresence(signedPsbt, listingIds.length);
-    if (!sigCheck.valid) {
-      throw new ValidationError(sigCheck.details);
-    }
-
-    for (let i = 0; i < listingIds.length; i++) {
-      const listingId = listingIds[i];
-      const listing = this.listingRepo.findById(listingId)!;
+      const sigCheck = this.psbtService.validateSignaturePresence(signedPsbtHex, 1);
+      if (!sigCheck.valid) {
+        logger.warn('PSBT rejected for listing', { listingId, index: i, details: sigCheck.details });
+        throw new ValidationError(`Listing #${i + 1} (${listing.bitmapNumber || listing.name}): ${sigCheck.details}`);
+      }
 
       const isPriceUpdate = listing.listedAt && listing.listedAt < Date.now() - 1000;
 
       this.listingRepo.updatePsbtFields(listingId, {
-        signedPsbt,
+        signedPsbt: signedPsbtHex,
         psbtStatus: 'signed',
         isActive: true,
         ...(isPriceUpdate ? { listedAt: Date.now() } : {}),
       });
 
-      this.listingRepo.saveBatchMapping(listingId, signedPsbt, i);
+      this.listingRepo.saveBatchMapping(listingId, signedPsbtHex, 0);
 
       results.push(this.listingRepo.findById(listingId)!);
     }
 
+    logger.info('All batch listings signed successfully', { count: results.length });
     await this.triggerLocalMarketplaceRefresh();
 
     return results;
