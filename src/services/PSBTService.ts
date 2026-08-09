@@ -314,8 +314,15 @@ export class PSBTService {
     };
   }
 
-  async finalizeAndBroadcast(psbtBase64: string): Promise<string> {
-    const psbt = bitcoin.Psbt.fromBase64(psbtBase64, { network: NETWORK });
+  async finalizeAndBroadcast(psbtInput: string): Promise<string> {
+    let psbt: bitcoin.Psbt;
+    const cleanInput = psbtInput.trim();
+    if (/^[0-9a-fA-F]+$/.test(cleanInput) && cleanInput.length % 2 === 0) {
+      const buf = Buffer.from(cleanInput, 'hex');
+      psbt = bitcoin.Psbt.fromBuffer(buf, { network: NETWORK });
+    } else {
+      psbt = bitcoin.Psbt.fromBase64(cleanInput, { network: NETWORK });
+    }
     
     for (let i = 0; i < psbt.data.inputs.length; i++) {
       try {
