@@ -637,7 +637,13 @@ export class PSBTService {
     const sellerSigs: Array<{ partialSig: any[]; tapScriptSig: any[]; tapKeySig: any }> = [];
 
     for (const listing of listings) {
-      const sellerPsbt = bitcoin.Psbt.fromBase64(listing.signedPsbtBase64, { network: NETWORK });
+      const cleanPsbt = listing.signedPsbtBase64.trim();
+      let sellerPsbt: bitcoin.Psbt;
+      if (/^[0-9a-fA-F]+$/.test(cleanPsbt) && cleanPsbt.length % 2 === 0) {
+        sellerPsbt = bitcoin.Psbt.fromBuffer(Buffer.from(cleanPsbt, 'hex'), { network: NETWORK });
+      } else {
+        sellerPsbt = bitcoin.Psbt.fromBase64(cleanPsbt, { network: NETWORK });
+      }
 
       const txInput = sellerPsbt.txInputs[listing.psbtIndex];
       const txOutput = sellerPsbt.txOutputs[listing.psbtIndex];

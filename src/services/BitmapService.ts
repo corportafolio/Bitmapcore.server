@@ -307,7 +307,7 @@ export class BitmapService {
     inscriptionContentType: string;
     inscriptionHeight: number;
     isPriceUpdate: boolean;
-  }>): Promise<{ listingIds: string[]; psbtToSigns: Array<{ listingId: string; unsignedPsbtHex: string }> }> {
+  }>): Promise<{ listingIds: string[]; psbtToSign: string; psbtToSigns: Array<{ listingId: string; unsignedPsbtHex: string }> }> {
     logger.info('Creating batch listing', { count: items.length });
 
     const listingIds: string[] = [];
@@ -408,22 +408,24 @@ export class BitmapService {
       }
     }
 
-    const psbtHexs = this.psbtService.createSeparateListingPSBTs(psbtInputs);
+    const combinedPsbt = await this.psbtService.createBatchListingPSBT(psbtInputs);
+    const separatePsbtHexs = this.psbtService.createSeparateListingPSBTs(psbtInputs);
 
     const psbtToSigns: Array<{ listingId: string; unsignedPsbtHex: string }> = [];
     for (let i = 0; i < listingIds.length; i++) {
       const id = listingIds[i];
       this.listingRepo.updatePsbtFields(id, {
-        unsignedPsbt: psbtHexs[i],
+        unsignedPsbt: separatePsbtHexs[i],
         psbtStatus: 'pending',
       });
-      psbtToSigns.push({ listingId: id, unsignedPsbtHex: psbtHexs[i] });
+      psbtToSigns.push({ listingId: id, unsignedPsbtHex: separatePsbtHexs[i] });
     }
 
     await this.triggerLocalMarketplaceRefresh();
 
     return {
       listingIds,
+      psbtToSign: combinedPsbt.unsignedPsbt,
       psbtToSigns,
     };
   }
