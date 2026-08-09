@@ -207,7 +207,7 @@ export class TransactionService {
     bitmapIds: string[],
     buyerAddress: string,
     idempotencyKey: string
-  ): Promise<{ psbt: string; transactionId: string; expiresAt: number; items: Array<{ bitmapId: string; name: string; price: number; sellerAddress: string }> }> {
+  ): Promise<{ psbt: string; transactionId: string; expiresAt: number; items: Array<{ bitmapId: string; name: string; price: number; sellerAddress: string }>; buyerInputCount: number }> {
     logger.info('Creating batch purchase PSBT', { bitmapCount: bitmapIds.length, buyerAddress });
 
     if (!isValidBitcoinAddress(buyerAddress)) {
