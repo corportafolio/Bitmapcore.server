@@ -209,19 +209,21 @@ export class PSBTService {
     buyerAddress: string,
     price: number,
     buyerUtxos: UTXO[],
-    sellerPaymentAddress: string
+    sellerPaymentAddress: string,
+    psbtIndex: number = 0
   ): Promise<CompletedPSBTData> {
     logger.info('Completing purchase PSBT', { 
       buyerAddress, 
       price, 
-      utxoCount: buyerUtxos.length 
+      utxoCount: buyerUtxos.length,
+      psbtIndex
     });
 
     const sellerPsbt = bitcoin.Psbt.fromBase64(signedListingPsbtBase64, { network: NETWORK });
 
-    const sellerTxInput = sellerPsbt.txInputs[0];
-    const sellerTxOutput = sellerPsbt.txOutputs[0];
-    const sellerInputData = sellerPsbt.data.inputs[0];
+    const sellerTxInput = sellerPsbt.txInputs[psbtIndex];
+    const sellerTxOutput = sellerPsbt.txOutputs[psbtIndex];
+    const sellerInputData = sellerPsbt.data.inputs[psbtIndex];
 
     const psbt = new bitcoin.Psbt({ network: NETWORK });
 
@@ -492,7 +494,7 @@ export class PSBTService {
   }
 
   async completeBatchPurchasePSBT(
-    listings: Array<{ signedPsbtBase64: string; price: number; sellerPaymentAddress: string }>,
+    listings: Array<{ signedPsbtBase64: string; price: number; sellerPaymentAddress: string; psbtIndex: number }>,
     buyerAddress: string,
     buyerUtxos: UTXO[]
   ): Promise<{ psbt: string; marketplaceFee: number; changeValue: number; buyerInputs: Array<{ txid: string; vout: number; value: number }> }> {
@@ -512,9 +514,9 @@ export class PSBTService {
     for (const listing of listings) {
       const sellerPsbt = bitcoin.Psbt.fromBase64(listing.signedPsbtBase64, { network: NETWORK });
 
-      const txInput = sellerPsbt.txInputs[0];
-      const txOutput = sellerPsbt.txOutputs[0];
-      const inputData = sellerPsbt.data.inputs[0];
+      const txInput = sellerPsbt.txInputs[listing.psbtIndex];
+      const txOutput = sellerPsbt.txOutputs[listing.psbtIndex];
+      const inputData = sellerPsbt.data.inputs[listing.psbtIndex];
 
       psbt.addInput({
         hash: txInput.hash,

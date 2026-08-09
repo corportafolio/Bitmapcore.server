@@ -110,6 +110,16 @@ function runMigrations(database: Database.Database): void {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS batch_listings (
+      id TEXT PRIMARY KEY,
+      listing_id TEXT NOT NULL,
+      batch_psbt TEXT NOT NULL,
+      psbt_index INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_batch_listings_listing_id ON batch_listings(listing_id);
+
     CREATE TABLE IF NOT EXISTS ventas_historial (
       id TEXT PRIMARY KEY,
       listing_id TEXT NOT NULL,

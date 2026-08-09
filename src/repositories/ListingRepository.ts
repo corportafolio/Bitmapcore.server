@@ -289,4 +289,31 @@ export class ListingRepository {
     `).all(sinceTimestamp) as ListingRow[];
     return rows.map(rowToListing);
   }
+
+  getBatchMapping(listingId: string): { batchPsbt: string; psbtIndex: number } | null {
+    const db = getDb();
+    const row = db.prepare(
+      'SELECT batch_psbt, psbt_index FROM batch_listings WHERE listing_id = ?'
+    ).get(listingId) as { batch_psbt: string; psbt_index: number } | undefined;
+    return row ? { batchPsbt: row.batch_psbt, psbtIndex: row.psbt_index } : null;
+  }
+
+  saveBatchMapping(listingId: string, batchPsbt: string, psbtIndex: number): void {
+    const db = getDb();
+    const id = uuidv4();
+    const now = Date.now();
+    db.prepare(
+      'INSERT INTO batch_listings (id, listing_id, batch_psbt, psbt_index, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run(id, listingId, batchPsbt, psbtIndex, now);
+  }
+
+  deleteBatchMapping(listingId: string): void {
+    const db = getDb();
+    db.prepare('DELETE FROM batch_listings WHERE listing_id = ?').run(listingId);
+  }
+
+  deleteBatchMappingsByPsbt(batchPsbt: string): void {
+    const db = getDb();
+    db.prepare('DELETE FROM batch_listings WHERE batch_psbt = ?').run(batchPsbt);
+  }
 }

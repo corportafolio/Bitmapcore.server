@@ -198,6 +198,8 @@ export class BitmapService {
       throw new ValidationError('Invalid PSBT signature for new price');
     }
 
+    this.listingRepo.deleteBatchMapping(listingId);
+
     this.listingRepo.updatePsbtFields(listingId, {
       signedPsbt,
       psbtStatus: 'signed',
@@ -207,7 +209,6 @@ export class BitmapService {
 
     logger.info('Price update signed and activated', { listingId, newPrice });
 
-    // Trigger immediate local marketplace refresh on port 5500
     await this.triggerLocalMarketplaceRefresh();
 
     return this.listingRepo.findById(listingId)!;
@@ -277,6 +278,7 @@ export class BitmapService {
       throw new ValidationError('Cannot delete a sold listing');
     }
 
+    this.listingRepo.deleteBatchMapping(id);
     this.listingRepo.delete(id);
     logger.info('Listing deleted', { listingId: id });
   }
@@ -352,6 +354,8 @@ export class BitmapService {
           throw new ValidationError('Listing missing PSBT data');
         }
 
+        this.listingRepo.deleteBatchMapping(existing.id);
+
         this.listingRepo.updatePsbtFields(existing.id, {
           price: item.price,
           listedAt: Date.now(),
@@ -373,6 +377,7 @@ export class BitmapService {
         }
 
         if (existing && !existing.isActive) {
+          this.listingRepo.deleteBatchMapping(existing.id);
           this.listingRepo.delete(existing.id);
         }
 
@@ -455,7 +460,8 @@ export class BitmapService {
       throw new ValidationError('Invalid PSBT signature: one or more outputs failed validation');
     }
 
-    for (const listingId of listingIds) {
+    for (let i = 0; i < listingIds.length; i++) {
+      const listingId = listingIds[i];
       const listing = this.listingRepo.findById(listingId)!;
 
       const isPriceUpdate = listing.listedAt && listing.listedAt < Date.now() - 1000;
@@ -466,6 +472,8 @@ export class BitmapService {
         isActive: true,
         ...(isPriceUpdate ? { listedAt: Date.now() } : {}),
       });
+
+      this.listingRepo.saveBatchMapping(listingId, signedPsbt, i);
 
       results.push(this.listingRepo.findById(listingId)!);
     }

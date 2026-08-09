@@ -76,12 +76,18 @@ export class TransactionService {
       throw new ValidationError('No hay saldo disponible para pagar: todos los UTXOs de esta wallet contienen activos. Recarga saldo en una dirección de pago sin inscripciones.');
     }
 
+    const batchMapping = this.listingRepo.getBatchMapping(bitmapId);
+    const psbtIndex = batchMapping ? batchMapping.psbtIndex : 0;
+
+    const signedPsbtToUse = batchMapping ? batchMapping.batchPsbt : listing.signedPsbt!;
+
     const completedResult = await this.psbtService.completePurchasePSBT(
-      listing.signedPsbt,
+      signedPsbtToUse,
       buyerAddress,
       listing.price,
       cleanUtxos,
-      listing.sellerPaymentAddress!
+      listing.sellerPaymentAddress!,
+      psbtIndex
     );
 
     const transactionId = completedResult.transactionId;
@@ -238,11 +244,15 @@ export class TransactionService {
       throw new ValidationError('No hay saldo disponible para pagar: todos los UTXOs de esta wallet contienen activos. Recarga saldo en una dirección de pago sin inscripciones.');
     }
 
-    const batchInputsWithPsbt = listings.map(l => ({
-      signedPsbtBase64: l.signedPsbt!,
-      price: l.price,
-      sellerPaymentAddress: l.sellerPaymentAddress || '',
-    }));
+    const batchInputsWithPsbt = listings.map(l => {
+      const batchMapping = this.listingRepo.getBatchMapping(l.id);
+      return {
+        signedPsbtBase64: batchMapping ? batchMapping.batchPsbt : l.signedPsbt!,
+        price: l.price,
+        sellerPaymentAddress: l.sellerPaymentAddress || '',
+        psbtIndex: batchMapping ? batchMapping.psbtIndex : 0,
+      };
+    });
 
     const completedResult = await this.psbtService.completeBatchPurchasePSBT(
       batchInputsWithPsbt,
