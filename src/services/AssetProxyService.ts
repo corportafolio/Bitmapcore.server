@@ -171,15 +171,15 @@ export class AssetProxyService {
 
     const outputIds = utxos.map(u => `${u.txid}:${u.vout}`);
     const results = await limitConcurrency(outputIds, 10, async (outputId: string) => {
-      const ids = await this.fetchInscriptionIdsFromOutputStrict(outputId);
-      return { outputId, hasInscriptions: ids.length > 0 };
+      const hasAssets = await this.fetchOutputHasAssetsStrict(outputId);
+      return { outputId, hasAssets };
     });
 
     const inscribed = new Set<string>();
     let failures = 0;
     for (const r of results) {
       if (!r) { failures++; continue; }
-      if (r.hasInscriptions) inscribed.add(r.outputId.toLowerCase());
+      if (r.hasAssets) inscribed.add(r.outputId.toLowerCase());
     }
 
     if (failures > 0) {
@@ -232,19 +232,15 @@ export class AssetProxyService {
     }
   }
 
-  private async fetchInscriptionIdsFromOutputStrict(outputId: string): Promise<string[]> {
+  private async fetchOutputHasAssetsStrict(outputId: string): Promise<boolean> {
     const response = await axios.get(`${this.baseUrl}/output/${outputId}`, {
       timeout: 15000,
       headers: { 'User-Agent': UA, 'Accept': 'text/html' }
     });
     const html = typeof response.data === 'string' ? response.data : '';
-    const regex = /\/inscription\/([a-f0-9]{64}i\d+)/g;
-    const ids: string[] = [];
-    let match;
-    while ((match = regex.exec(html)) !== null) {
-      ids.push(match[1]);
-    }
-    return [...new Set(ids)];
+    const hasInscriptions = /<dt>inscriptions<\/dt>/.test(html) || /\/inscription\/[a-f0-9]{64}i-?\d+/.test(html);
+    const hasRunes = /<dt>runes<\/dt>/.test(html) || /\/rune\/[^<"]+/.test(html);
+    return hasInscriptions || hasRunes;
   }
 
   private async processInscriptions(inscriptionIds: string[], address: string): Promise<AssetInscription[]> {
