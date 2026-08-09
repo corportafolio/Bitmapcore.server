@@ -324,16 +324,6 @@ export class PSBTService {
       psbt = bitcoin.Psbt.fromBase64(cleanInput, { network: NETWORK });
     }
     
-    for (let i = 0; i < psbt.data.inputs.length; i++) {
-      try {
-        psbt.validateSignaturesOfInput(i, (pubkey, msghash, signature) => 
-          ECPair.fromPublicKey(pubkey).verify(msghash, signature)
-        );
-      } catch {
-        throw new ValidationError(`Invalid signature on input ${i}`);
-      }
-    }
-
     psbt.finalizeAllInputs();
     const tx = psbt.extractTransaction();
     const rawTx = tx.toHex();
