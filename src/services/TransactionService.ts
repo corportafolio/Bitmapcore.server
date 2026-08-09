@@ -288,6 +288,7 @@ export class TransactionService {
         price: l.price,
         sellerAddress: l.sellerAddress,
       })),
+      buyerInputCount: completedResult.buyerInputs.length,
     };
   }
 
