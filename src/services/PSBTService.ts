@@ -366,29 +366,30 @@ export class PSBTService {
     let unfinalizedInputs: number[] = [];
     for (let i = 0; i < psbt.data.inputs.length; i++) {
       const input = psbt.data.inputs[i] as any;
+
       if (input.finalScriptWitness || input.finalScriptSig) {
-        if (input.tapKeySig || (input.partialSig && input.partialSig.length > 0)) {
-          logger.info('Input already finalized with valid signature', { inputIndex: i });
-          continue;
-        }
-        logger.warn('Input has finalScriptWitness but NO tapKeySig — discarding garbage witness data', { inputIndex: i });
-        delete input.finalScriptWitness;
-        delete input.finalScriptSig;
+        logger.info('Input has finalScriptWitness — keeping wallet signature', { inputIndex: i });
+        continue;
       }
+
       if (input.tapKeySig) {
         input.finalScriptWitness = [input.tapKeySig];
-        logger.info('Finalized taproot input (key-path)', { inputIndex: i, tapKeySigLen: input.tapKeySig.length });
-      } else if (input.partialSig && input.partialSig.length > 0) {
+        logger.info('Finalized taproot input from tapKeySig', { inputIndex: i, tapKeySigLen: input.tapKeySig.length });
+        continue;
+      }
+
+      if (input.partialSig && input.partialSig.length > 0) {
         logger.info('Input has partialSig but no finalization method', { inputIndex: i });
         unfinalizedInputs.push(i);
-      } else {
-        logger.warn('Input has NO signature data - cannot finalize', { inputIndex: i });
-        unfinalizedInputs.push(i);
+        continue;
       }
+
+      logger.warn('Input has NO signature data - cannot finalize', { inputIndex: i });
+      unfinalizedInputs.push(i);
     }
 
     if (unfinalizedInputs.length > 0) {
-      throw new Error(`Cannot finalize inputs: ${unfinalizedInputs.join(', ')} - missing signature data (tapKeySig). Buyer inputs must be signed by the buyer wallet.`);
+      throw new Error(`Cannot finalize inputs: ${unfinalizedInputs.join(', ')} - missing signature data. Buyer inputs must be signed by the buyer wallet.`);
     }
 
     const tx = psbt.extractTransaction(false);
