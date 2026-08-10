@@ -373,8 +373,13 @@ export class PSBTService {
       }
 
       if (input.tapKeySig) {
-        input.finalScriptWitness = [input.tapKeySig];
-        logger.info('Finalized taproot input from tapKeySig', { inputIndex: i, tapKeySigLen: input.tapKeySig.length });
+        const sig = input.tapKeySig;
+        const witnessBuf = Buffer.alloc(2 + sig.length);
+        witnessBuf[0] = 0x01;
+        witnessBuf[1] = sig.length;
+        sig.copy(witnessBuf, 2);
+        input.finalScriptWitness = witnessBuf;
+        logger.info('Finalized taproot input from tapKeySig', { inputIndex: i, tapKeySigLen: sig.length, witnessLen: witnessBuf.length });
         continue;
       }
 
