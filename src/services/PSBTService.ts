@@ -621,7 +621,8 @@ export class PSBTService {
   async completeBatchPurchasePSBT(
     listings: Array<{ signedPsbtBase64: string; price: number; sellerPaymentAddress: string; psbtIndex: number }>,
     buyerAddress: string,
-    buyerUtxos: UTXO[]
+    buyerUtxos: UTXO[],
+    buyerPublicKey?: string
   ): Promise<{ psbt: string; marketplaceFee: number; changeValue: number; buyerInputs: Array<{ txid: string; vout: number; value: number }> }> {
     logger.info('Completing batch purchase PSBT', {
       listingCount: listings.length,
@@ -693,15 +694,26 @@ export class PSBTService {
       throw new ValidationError(`Saldo disponible insuficiente: se necesitan ${totalNeeded} sat, hay ${totalInputValue} sat. Los UTXOs con activos/inscripciones no se usan para pagar.`);
     }
 
+    let buyerTapInternalKey: Buffer | undefined;
+    if (buyerPublicKey) {
+      const cleanKey = buyerPublicKey.replace(/^0x/, '');
+      const xOnly = cleanKey.length === 66 ? cleanKey.slice(2) : cleanKey.slice(-64);
+      buyerTapInternalKey = Buffer.from(xOnly, 'hex');
+    }
+
     for (const utxo of selectedUtxos) {
-      psbt.addInput({
+      const input: any = {
         hash: utxo.txid,
         index: utxo.vout,
         witnessUtxo: {
           script: bitcoin.address.toOutputScript(buyerAddress, NETWORK),
           value: BigInt(utxo.value),
         },
-      });
+      };
+      if (buyerTapInternalKey) {
+        input.tapInternalKey = buyerTapInternalKey;
+      }
+      psbt.addInput(input);
     }
 
     const changeValue = totalInputValue - totalNeeded;

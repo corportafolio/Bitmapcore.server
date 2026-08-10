@@ -113,6 +113,7 @@ export const batchBuySchema = z.object({
   bitmapIds: z.array(z.string().uuid()).min(1).max(500),
   buyerAddress: z.string().min(26).max(62),
   idempotencyKey: z.string().min(1).max(100),
+  buyerPublicKey: z.string().min(64).max(130).optional(),
 });
 
 export const batchBroadcastSchema = z.object({

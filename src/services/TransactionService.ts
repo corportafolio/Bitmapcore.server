@@ -206,7 +206,8 @@ export class TransactionService {
   async createBatchPSBT(
     bitmapIds: string[],
     buyerAddress: string,
-    idempotencyKey: string
+    idempotencyKey: string,
+    buyerPublicKey?: string
   ): Promise<{ psbt: string; transactionId: string; expiresAt: number; items: Array<{ bitmapId: string; name: string; price: number; sellerAddress: string }>; buyerInputCount: number }> {
     logger.info('Creating batch purchase PSBT', { bitmapCount: bitmapIds.length, buyerAddress });
 
@@ -257,7 +258,8 @@ export class TransactionService {
     const completedResult = await this.psbtService.completeBatchPurchasePSBT(
       batchInputsWithPsbt,
       buyerAddress,
-      cleanUtxos
+      cleanUtxos,
+      buyerPublicKey
     );
 
     const expiresAt = Date.now() + config.transaction.psbtExpirationMs;
