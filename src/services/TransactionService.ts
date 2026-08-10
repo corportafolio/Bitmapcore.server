@@ -296,7 +296,12 @@ export class TransactionService {
   }
 
   async batchBroadcast(signedPsbt: string, transactionId: string): Promise<{ txid: string; status: string }> {
-    logger.info('Broadcasting batch transaction', { transactionId });
+    const isHex = /^[0-9a-fA-F]+$/.test(signedPsbt.trim()) && signedPsbt.trim().length % 2 === 0;
+    logger.info('Broadcasting batch transaction', {
+      transactionId,
+      signedPsbtFormat: isHex ? 'hex' : 'base64',
+      signedPsbtLength: signedPsbt.length,
+    });
 
     const batchTx = this.batchTxRepo.findById(transactionId);
     if (!batchTx) {

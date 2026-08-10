@@ -367,8 +367,13 @@ export class PSBTService {
     for (let i = 0; i < psbt.data.inputs.length; i++) {
       const input = psbt.data.inputs[i] as any;
       if (input.finalScriptWitness || input.finalScriptSig) {
-        logger.info('Input already finalized', { inputIndex: i });
-        continue;
+        if (input.tapKeySig || (input.partialSig && input.partialSig.length > 0)) {
+          logger.info('Input already finalized with valid signature', { inputIndex: i });
+          continue;
+        }
+        logger.warn('Input has finalScriptWitness but NO tapKeySig — discarding garbage witness data', { inputIndex: i });
+        delete input.finalScriptWitness;
+        delete input.finalScriptSig;
       }
       if (input.tapKeySig) {
         input.finalScriptWitness = [input.tapKeySig];
