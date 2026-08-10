@@ -363,6 +363,17 @@ export class PSBTService {
       psbt = bitcoin.Psbt.fromBase64(cleanInput, { network: NETWORK });
     }
 
+    for (let i = 0; i < psbt.data.inputs.length; i++) {
+      const input = psbt.data.inputs[i] as any;
+      if (input.finalScriptWitness || input.finalScriptSig) continue;
+      if (input.tapKeySig) {
+        input.finalScriptWitness = [input.tapKeySig];
+        logger.info('Finalized taproot input (key-path)', { inputIndex: i });
+      } else if (input.partialSig && input.partialSig.length > 0) {
+        logger.info('Input has partialSig but no finalization method', { inputIndex: i });
+      }
+    }
+
     psbt.finalizeAllInputs();
     const tx = psbt.extractTransaction();
     const rawTx = tx.toHex();
