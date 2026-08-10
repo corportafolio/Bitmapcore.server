@@ -433,15 +433,25 @@ export class BitmapService {
   async signBatchListings(listingIds: string[], signedPsbtHexs: string[], sellerOrdinalPublicKey: string): Promise<BitmapListing[]> {
     logger.info('Signing batch listings', { count: listingIds.length, signedCount: signedPsbtHexs.length });
 
-    if (listingIds.length !== signedPsbtHexs.length) {
+    const isCombined = signedPsbtHexs.length === 1 && listingIds.length > 1;
+
+    if (!isCombined && listingIds.length !== signedPsbtHexs.length) {
       throw new ValidationError(`Mismatch: ${listingIds.length} listings but ${signedPsbtHexs.length} signed PSBTs`);
+    }
+
+    if (isCombined) {
+      const sigCheck = this.psbtService.validateSignaturePresence(signedPsbtHexs[0], listingIds.length);
+      if (!sigCheck.valid) {
+        logger.error('Combined PSBT signature validation failed', { details: sigCheck.details });
+        throw new ValidationError(`PSBT combinado: ${sigCheck.details}`);
+      }
     }
 
     const results: BitmapListing[] = [];
 
     for (let i = 0; i < listingIds.length; i++) {
       const listingId = listingIds[i];
-      const signedPsbtHex = signedPsbtHexs[i];
+      const signedPsbtHex = isCombined ? signedPsbtHexs[0] : signedPsbtHexs[i];
 
       const listing = this.listingRepo.findById(listingId);
       if (!listing) {
@@ -456,10 +466,12 @@ export class BitmapService {
         throw new ValidationError('Public key does not match listing');
       }
 
-      const sigCheck = this.psbtService.validateSignaturePresence(signedPsbtHex, 1);
-      if (!sigCheck.valid) {
-        logger.warn('PSBT rejected for listing', { listingId, index: i, details: sigCheck.details });
-        throw new ValidationError(`Listing #${i + 1} (${listing.bitmapNumber || listing.name}): ${sigCheck.details}`);
+      if (!isCombined) {
+        const sigCheck = this.psbtService.validateSignaturePresence(signedPsbtHex, 1);
+        if (!sigCheck.valid) {
+          logger.warn('PSBT rejected for listing', { listingId, index: i, details: sigCheck.details });
+          throw new ValidationError(`Listing #${i + 1} (${listing.bitmapNumber || listing.name}): ${sigCheck.details}`);
+        }
       }
 
       const isPriceUpdate = listing.listedAt && listing.listedAt < Date.now() - 1000;
@@ -471,12 +483,12 @@ export class BitmapService {
         ...(isPriceUpdate ? { listedAt: Date.now() } : {}),
       });
 
-      this.listingRepo.saveBatchMapping(listingId, signedPsbtHex, 0);
+      this.listingRepo.saveBatchMapping(listingId, signedPsbtHex, isCombined ? i : 0);
 
       results.push(this.listingRepo.findById(listingId)!);
     }
 
-    logger.info('All batch listings signed successfully', { count: results.length });
+    logger.info('All batch listings signed successfully', { count: results.length, isCombined });
     await this.triggerLocalMarketplaceRefresh();
 
     return results;
