@@ -10,6 +10,7 @@ const ECPair = ecpair.ECPairFactory(tinysecp);
 
 const NETWORK = bitcoin.networks.bitcoin;
 const DUST_LIMIT = 546n;
+const MIN_FEE = 546;
 const MARKETPLACE_FEE_PERCENT = config.marketplace.feePercent || 2;
 
 export interface InscriptionUTXO {
@@ -279,7 +280,7 @@ export class PSBTService {
       value: sellerTxOutput.value,
     });
 
-    const marketplaceFee = Math.floor(price * MARKETPLACE_FEE_PERCENT / 100);
+    const marketplaceFee = Math.max(MIN_FEE, Math.floor(price * MARKETPLACE_FEE_PERCENT / 100));
     const totalNeeded = BigInt(price) + BigInt(marketplaceFee) + DUST_LIMIT;
     
     let selectedUtxos: UTXO[] = [];
@@ -705,6 +706,8 @@ export class PSBTService {
       totalPrice += listing.price;
       totalFee += Math.floor(listing.price * MARKETPLACE_FEE_PERCENT / 100);
     }
+
+    totalFee = Math.max(MIN_FEE, totalFee);
 
     psbt.addOutput({
       address: config.marketplace.feeAddress || listings[0].sellerPaymentAddress,
