@@ -328,24 +328,26 @@ export class TransactionService {
     }
 
     try {
-      const storedPsbt = bitcoin.Psbt.fromBase64(batchTx.psbt, { network: bitcoin.networks.bitcoin });
-      let parsedPsbt: bitcoin.Psbt;
-      const cleanRestored = restoredPsbt.trim();
-      if (/^[0-9a-fA-F]+$/.test(cleanRestored) && cleanRestored.length % 2 === 0) {
-        parsedPsbt = bitcoin.Psbt.fromBuffer(Buffer.from(cleanRestored, 'hex'), { network: bitcoin.networks.bitcoin });
-      } else {
-        parsedPsbt = bitcoin.Psbt.fromBase64(cleanRestored, { network: bitcoin.networks.bitcoin });
-      }
-      let restoredCount = 0;
-      for (let i = 0; i < parsedPsbt.data.inputs.length; i++) {
-        if (!parsedPsbt.data.inputs[i].tapInternalKey && storedPsbt.data.inputs[i]?.tapInternalKey) {
-          (parsedPsbt.data.inputs[i] as any).tapInternalKey = storedPsbt.data.inputs[i].tapInternalKey;
-          restoredCount++;
+      if (batchTx.psbt) {
+        const storedPsbt = bitcoin.Psbt.fromBase64(batchTx.psbt, { network: bitcoin.networks.bitcoin });
+        let parsedPsbt: bitcoin.Psbt;
+        const cleanRestored = restoredPsbt.trim();
+        if (/^[0-9a-fA-F]+$/.test(cleanRestored) && cleanRestored.length % 2 === 0) {
+          parsedPsbt = bitcoin.Psbt.fromBuffer(Buffer.from(cleanRestored, 'hex'), { network: bitcoin.networks.bitcoin });
+        } else {
+          parsedPsbt = bitcoin.Psbt.fromBase64(cleanRestored, { network: bitcoin.networks.bitcoin });
         }
-      }
-      if (restoredCount > 0) {
-        logger.info('Restored tapInternalKey from stored PSBT', { transactionId, restoredCount });
-        restoredPsbt = parsedPsbt.toBase64();
+        let restoredCount = 0;
+        for (let i = 0; i < parsedPsbt.data.inputs.length; i++) {
+          if (!parsedPsbt.data.inputs[i].tapInternalKey && storedPsbt.data.inputs[i]?.tapInternalKey) {
+            (parsedPsbt.data.inputs[i] as any).tapInternalKey = storedPsbt.data.inputs[i].tapInternalKey;
+            restoredCount++;
+          }
+        }
+        if (restoredCount > 0) {
+          logger.info('Restored tapInternalKey from stored PSBT', { transactionId, restoredCount });
+          restoredPsbt = parsedPsbt.toBase64();
+        }
       }
     } catch (e: any) {
       logger.warn('Failed to restore tapInternalKey from stored PSBT', { transactionId, error: e.message });
