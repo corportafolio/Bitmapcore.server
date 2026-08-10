@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import * as bitcoin from 'bitcoinjs-lib';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { IdempotencyRepository } from '../repositories/IdempotencyRepository';
 import { ListingRepository } from '../repositories/ListingRepository';
@@ -324,6 +325,30 @@ export class TransactionService {
     let restoredPsbt = signedPsbt;
     if (batchMappings.length > 0) {
       restoredPsbt = this.psbtService.restoreSellerTapSigs(signedPsbt, batchMappings);
+    }
+
+    try {
+      const storedPsbt = bitcoin.Psbt.fromBase64(batchTx.psbt, { network: bitcoin.networks.bitcoin });
+      let parsedPsbt: bitcoin.Psbt;
+      const cleanRestored = restoredPsbt.trim();
+      if (/^[0-9a-fA-F]+$/.test(cleanRestored) && cleanRestored.length % 2 === 0) {
+        parsedPsbt = bitcoin.Psbt.fromBuffer(Buffer.from(cleanRestored, 'hex'), { network: bitcoin.networks.bitcoin });
+      } else {
+        parsedPsbt = bitcoin.Psbt.fromBase64(cleanRestored, { network: bitcoin.networks.bitcoin });
+      }
+      let restoredCount = 0;
+      for (let i = 0; i < parsedPsbt.data.inputs.length; i++) {
+        if (!parsedPsbt.data.inputs[i].tapInternalKey && storedPsbt.data.inputs[i]?.tapInternalKey) {
+          (parsedPsbt.data.inputs[i] as any).tapInternalKey = storedPsbt.data.inputs[i].tapInternalKey;
+          restoredCount++;
+        }
+      }
+      if (restoredCount > 0) {
+        logger.info('Restored tapInternalKey from stored PSBT', { transactionId, restoredCount });
+        restoredPsbt = parsedPsbt.toBase64();
+      }
+    } catch (e: any) {
+      logger.warn('Failed to restore tapInternalKey from stored PSBT', { transactionId, error: e.message });
     }
 
     let lastError: Error | null = null;
