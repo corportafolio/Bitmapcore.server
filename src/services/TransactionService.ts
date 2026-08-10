@@ -209,7 +209,7 @@ export class TransactionService {
     buyerAddress: string,
     idempotencyKey: string,
     buyerPublicKey?: string
-  ): Promise<{ psbt: string; transactionId: string; expiresAt: number; items: Array<{ bitmapId: string; name: string; price: number; sellerAddress: string }>; buyerInputCount: number }> {
+  ): Promise<{ psbt: string; transactionId: string; expiresAt: number; marketplaceFee: number; items: Array<{ bitmapId: string; name: string; price: number; sellerAddress: string }>; buyerInputCount: number }> {
     logger.info('Creating batch purchase PSBT', { bitmapCount: bitmapIds.length, buyerAddress, hasBuyerPublicKey: !!buyerPublicKey, buyerPublicKeyLength: buyerPublicKey ? buyerPublicKey.length : 0 });
 
     if (!isValidBitcoinAddress(buyerAddress)) {
@@ -285,6 +285,7 @@ export class TransactionService {
       psbt: completedResult.psbt,
       transactionId: batchTx.id,
       expiresAt,
+      marketplaceFee: completedResult.marketplaceFee,
       items: listings.map(l => ({
         bitmapId: l.id,
         name: l.name,
