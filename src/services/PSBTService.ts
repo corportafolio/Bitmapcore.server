@@ -363,19 +363,30 @@ export class PSBTService {
       psbt = bitcoin.Psbt.fromBase64(cleanInput, { network: NETWORK });
     }
 
+    let unfinalizedInputs: number[] = [];
     for (let i = 0; i < psbt.data.inputs.length; i++) {
       const input = psbt.data.inputs[i] as any;
-      if (input.finalScriptWitness || input.finalScriptSig) continue;
+      if (input.finalScriptWitness || input.finalScriptSig) {
+        logger.info('Input already finalized', { inputIndex: i });
+        continue;
+      }
       if (input.tapKeySig) {
         input.finalScriptWitness = [input.tapKeySig];
-        logger.info('Finalized taproot input (key-path)', { inputIndex: i });
+        logger.info('Finalized taproot input (key-path)', { inputIndex: i, tapKeySigLen: input.tapKeySig.length });
       } else if (input.partialSig && input.partialSig.length > 0) {
         logger.info('Input has partialSig but no finalization method', { inputIndex: i });
+        unfinalizedInputs.push(i);
+      } else {
+        logger.warn('Input has NO signature data - cannot finalize', { inputIndex: i });
+        unfinalizedInputs.push(i);
       }
     }
 
-    psbt.finalizeAllInputs();
-    const tx = psbt.extractTransaction();
+    if (unfinalizedInputs.length > 0) {
+      throw new Error(`Cannot finalize inputs: ${unfinalizedInputs.join(', ')} - missing signature data (tapKeySig). Buyer inputs must be signed by the buyer wallet.`);
+    }
+
+    const tx = psbt.extractTransaction(false);
     const rawTx = tx.toHex();
 
     logger.info('Transaction finalized', { txid: tx.getId(), rawTxLength: rawTx.length });
@@ -710,6 +721,9 @@ export class PSBTService {
       const cleanKey = buyerPublicKey.replace(/^0x/, '');
       const xOnly = cleanKey.length === 66 ? cleanKey.slice(2) : cleanKey.slice(-64);
       buyerTapInternalKey = Buffer.from(xOnly, 'hex');
+      logger.info('Buyer tapInternalKey derived from publicKey', { xOnlyLength: xOnly.length, tapInternalKeyHex: buyerTapInternalKey.toString('hex') });
+    } else {
+      logger.warn('NO buyerPublicKey provided - buyer inputs will NOT have tapInternalKey - wallet cannot sign taproot inputs!');
     }
 
     for (const utxo of selectedUtxos) {

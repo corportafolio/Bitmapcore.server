@@ -210,7 +210,7 @@ export class TransactionService {
     idempotencyKey: string,
     buyerPublicKey?: string
   ): Promise<{ psbt: string; transactionId: string; expiresAt: number; items: Array<{ bitmapId: string; name: string; price: number; sellerAddress: string }>; buyerInputCount: number }> {
-    logger.info('Creating batch purchase PSBT', { bitmapCount: bitmapIds.length, buyerAddress });
+    logger.info('Creating batch purchase PSBT', { bitmapCount: bitmapIds.length, buyerAddress, hasBuyerPublicKey: !!buyerPublicKey, buyerPublicKeyLength: buyerPublicKey ? buyerPublicKey.length : 0 });
 
     if (!isValidBitcoinAddress(buyerAddress)) {
       throw new ValidationError('Dirección Bitcoin del comprador inválida');
@@ -351,6 +351,28 @@ export class TransactionService {
       }
     } catch (e: any) {
       logger.warn('Failed to restore tapInternalKey from stored PSBT', { transactionId, error: e.message });
+    }
+
+    try {
+      const diagnosticPsbt = bitcoin.Psbt.fromBase64(restoredPsbt, { network: bitcoin.networks.bitcoin });
+      const inputSummary = diagnosticPsbt.data.inputs.map((inp: any, idx: number) => ({
+        index: idx,
+        hasTapKeySig: !!inp.tapKeySig,
+        hasTapInternalKey: !!inp.tapInternalKey,
+        hasPartialSig: !!(inp.partialSig && inp.partialSig.length > 0),
+        hasFinalScriptWitness: !!inp.finalScriptWitness,
+      }));
+      const signedCount = inputSummary.filter(i => i.hasTapKeySig).length;
+      const unsignedCount = inputSummary.filter(i => !i.hasTapKeySig && !i.hasPartialSig).length;
+      logger.info('PSBT input signature status before finalize', {
+        transactionId,
+        totalInputs: inputSummary.length,
+        signedWithTapKeySig: signedCount,
+        unsigned: unsignedCount,
+        inputs: inputSummary,
+      });
+    } catch (e: any) {
+      logger.warn('Could not parse PSBT for diagnostic', { transactionId, error: e.message });
     }
 
     let lastError: Error | null = null;
