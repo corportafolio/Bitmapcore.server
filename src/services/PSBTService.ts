@@ -377,7 +377,7 @@ export class PSBTService {
         const witnessBuf = Buffer.alloc(2 + sig.length);
         witnessBuf[0] = 0x01;
         witnessBuf[1] = sig.length;
-        sig.copy(witnessBuf, 2);
+        witnessBuf.set(sig, 2);
         input.finalScriptWitness = witnessBuf;
         logger.info('Finalized taproot input from tapKeySig', { inputIndex: i, tapKeySigLen: sig.length, witnessLen: witnessBuf.length });
         continue;
