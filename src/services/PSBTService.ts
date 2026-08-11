@@ -772,11 +772,17 @@ export class PSBTService {
           const cleanKey = buyerPaymentPublicKey.replace(/^0x/, '');
           const pubkey = Buffer.from(cleanKey, 'hex');
           const p2shP2wpkh: any = bitcoin.payments.p2wpkh({ pubkey, network: NETWORK });
-          if (p2shP2wpkh.script) {
-            buyerRedeemScript = Buffer.from(p2shP2wpkh.script);
-            logger.info('Buyer P2SH redeemScript derived from paymentPublicKey', { redeemScriptHex: buyerRedeemScript!.toString('hex') });
+          const redeemScript = p2shP2wpkh.output ? Buffer.from(p2shP2wpkh.output) : undefined;
+          if (redeemScript) {
+            const derivedP2sh: any = bitcoin.payments.p2sh({ redeem: { output: redeemScript, redeemVersion: 0 }, network: NETWORK });
+            if (derivedP2sh.address && derivedP2sh.address === paymentAddr) {
+              buyerRedeemScript = redeemScript;
+              logger.info('Buyer P2SH redeemScript derived and verified from paymentPublicKey', { redeemScriptHex: redeemScript.toString('hex'), derivedAddress: derivedP2sh.address });
+            } else {
+              logger.error('Buyer paymentPublicKey does NOT match the P2SH payment address', { derivedAddress: derivedP2sh.address || null, expectedAddress: paymentAddr });
+            }
           } else {
-            logger.error('Failed to derive P2SH redeemScript from paymentPublicKey - no script returned');
+            logger.error('Failed to derive P2SH redeemScript from paymentPublicKey - no output returned');
           }
         } catch (e: any) {
           logger.error('Failed to derive P2SH redeemScript from paymentPublicKey', { error: e.message });
