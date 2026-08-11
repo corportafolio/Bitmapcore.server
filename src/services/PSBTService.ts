@@ -410,7 +410,13 @@ export class PSBTService {
   }
 
   restoreSellerTapSigs(signedPsbtHex: string, batchMappings: Array<{ batchPsbtBase64: string; psbtIndex: number; inputIndex: number }>): string {
-    const buyerPsbt = bitcoin.Psbt.fromBuffer(Buffer.from(signedPsbtHex, 'hex'), { network: NETWORK });
+    const cleanInput = signedPsbtHex.trim();
+    let buyerPsbt: bitcoin.Psbt;
+    if (/^[0-9a-fA-F]+$/.test(cleanInput) && cleanInput.length % 2 === 0) {
+      buyerPsbt = bitcoin.Psbt.fromBuffer(Buffer.from(cleanInput, 'hex'), { network: NETWORK });
+    } else {
+      buyerPsbt = bitcoin.Psbt.fromBase64(cleanInput, { network: NETWORK });
+    }
 
     for (const mapping of batchMappings) {
       try {
