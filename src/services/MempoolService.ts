@@ -118,8 +118,8 @@ export class MempoolService {
     logger.info('Broadcasting raw transaction to mempool', { rawTxLength: rawTxHex.length });
 
     try {
-      const response = await withTimeout<{ txid: string }>(
-        axios.post<{ txid: string }>(
+      const rawResponse = await withTimeout<string>(
+        axios.post(
           `${this.baseUrl}/tx`,
           rawTxHex,
           {
@@ -131,9 +131,11 @@ export class MempoolService {
         'Mempool API broadcast'
       );
 
-      logger.info('Mempool accepted transaction', { txid: response.txid });
+      const txid = typeof rawResponse === 'string' ? rawResponse.trim() : (rawResponse as any).txid || String(rawResponse);
 
-      return { txid: response.txid };
+      logger.info('Mempool accepted transaction', { txid });
+
+      return { txid };
     } catch (error) {
       if (axios.isAxiosError(error)) {
         logger.error('Mempool broadcast error', {

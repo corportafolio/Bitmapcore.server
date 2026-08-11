@@ -146,6 +146,10 @@ export class TransactionService {
         const broadcastResult = await this.mempoolService.broadcast(rawTx);
         const txid = broadcastResult.txid;
 
+        if (!txid || typeof txid !== 'string' || txid.trim().length < 10) {
+          throw new ExternalApiError('Mempool no devolvió un txid válido. La transacción no fue aceptada.');
+        }
+
         this.transactionRepo.updateStatus(transactionId, 'BROADCASTED', txid);
         this.listingRepo.markAsSold(transaction.listingId, transaction.buyerAddress);
 
@@ -397,6 +401,10 @@ export class TransactionService {
 
         const broadcastResult = await this.mempoolService.broadcast(rawTx);
         const txid = broadcastResult.txid;
+
+        if (!txid || typeof txid !== 'string' || txid.trim().length < 10) {
+          throw new ExternalApiError('Mempool no devolvió un txid válido. La transacción no fue aceptada.');
+        }
 
         this.batchTxRepo.updateStatus(transactionId, 'BROADCASTED', txid);
 
