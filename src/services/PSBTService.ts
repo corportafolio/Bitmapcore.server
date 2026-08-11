@@ -83,7 +83,7 @@ export class PSBTService {
         value: BigInt(inscriptionUtxo.value),
       },
       tapInternalKey: this.pubkeyToXOnly(sellerOrdinalPublicKey),
-      sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+      sighashType: bitcoin.Transaction.SIGHASH_NONE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
     });
 
     psbt.addOutput({
@@ -138,7 +138,7 @@ export class PSBTService {
         value: BigInt(inscriptionUtxo.value),
       },
       tapInternalKey: this.pubkeyToXOnly(sellerOrdinalPublicKey),
-      sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+      sighashType: bitcoin.Transaction.SIGHASH_NONE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
     });
 
     psbt.addOutput({
@@ -185,7 +185,7 @@ export class PSBTService {
           value: BigInt(input.value),
         },
         tapInternalKey: input.tapInternalKey,
-        sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+        sighashType: bitcoin.Transaction.SIGHASH_NONE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
       });
 
       psbt.addOutput({
@@ -232,7 +232,7 @@ export class PSBTService {
           value: BigInt(input.value),
         },
         tapInternalKey: input.tapInternalKey,
-        sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+        sighashType: bitcoin.Transaction.SIGHASH_NONE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
       });
 
       psbt.addOutput({
@@ -275,7 +275,7 @@ export class PSBTService {
       index: sellerTxInput.index,
       witnessUtxo: sellerInputData.witnessUtxo,
       tapInternalKey: sellerInputData.tapInternalKey,
-      sighashType: sellerInputData.sighashType !== undefined ? sellerInputData.sighashType : bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+      sighashType: sellerInputData.sighashType !== undefined ? sellerInputData.sighashType : bitcoin.Transaction.SIGHASH_NONE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
     });
 
     psbt.addOutput({
