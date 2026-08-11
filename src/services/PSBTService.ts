@@ -52,7 +52,8 @@ export class PSBTService {
     price: number,
     sellerOrdinalPublicKey: string,
     clientUtxo?: string,
-    clientValue?: number
+    clientValue?: number,
+    sellerOrdinalAddress?: string
   ): Promise<ListingPSBTData> {
     logger.info('Creating listing PSBT', { inscriptionId, sellerPaymentAddress, price });
 
@@ -78,7 +79,7 @@ export class PSBTService {
       hash: inscriptionUtxo.txid,
       index: inscriptionUtxo.vout,
       witnessUtxo: {
-        script: bitcoin.address.toOutputScript(sellerPaymentAddress, NETWORK),
+        script: bitcoin.address.toOutputScript(sellerOrdinalAddress || sellerPaymentAddress, NETWORK),
         value: BigInt(inscriptionUtxo.value),
       },
       tapInternalKey: this.pubkeyToXOnly(sellerOrdinalPublicKey),
@@ -167,6 +168,7 @@ export class PSBTService {
     vout: number;
     value: number;
     tapInternalKey: Buffer;
+    sellerOrdinalAddress: string;
     sellerPaymentAddress: string;
     price: number;
   }>): Promise<{ unsignedPsbt: string }> {
@@ -179,7 +181,7 @@ export class PSBTService {
         hash: input.txid,
         index: input.vout,
         witnessUtxo: {
-          script: bitcoin.address.toOutputScript(input.sellerPaymentAddress, NETWORK),
+          script: bitcoin.address.toOutputScript(input.sellerOrdinalAddress, NETWORK),
           value: BigInt(input.value),
         },
         tapInternalKey: input.tapInternalKey,
@@ -210,6 +212,7 @@ export class PSBTService {
     vout: number;
     value: number;
     tapInternalKey: Buffer;
+    sellerOrdinalAddress: string;
     sellerPaymentAddress: string;
     price: number;
   }>): string[] {
@@ -225,7 +228,7 @@ export class PSBTService {
         hash: input.txid,
         index: input.vout,
         witnessUtxo: {
-          script: bitcoin.address.toOutputScript(input.sellerPaymentAddress, NETWORK),
+          script: bitcoin.address.toOutputScript(input.sellerOrdinalAddress, NETWORK),
           value: BigInt(input.value),
         },
         tapInternalKey: input.tapInternalKey,

@@ -51,7 +51,8 @@ export class BitmapService {
       data.price,
       data.sellerOrdinalPublicKey,
       data.inscriptionUtxo,
-      data.inscriptionValue
+      data.inscriptionValue,
+      data.sellerAddress
     );
 
     const listing = this.listingRepo.create(data);
@@ -316,6 +317,7 @@ export class BitmapService {
       vout: number;
       value: number;
       tapInternalKey: Buffer;
+      sellerOrdinalAddress: string;
       sellerPaymentAddress: string;
       price: number;
     }> = [];
@@ -368,6 +370,7 @@ export class BitmapService {
           vout: inscriptionUtxo.vout,
           value: inscriptionUtxo.value,
           tapInternalKey: this.psbtService.pubkeyToXOnly(existing.sellerOrdinalPublicKey),
+          sellerOrdinalAddress: existing.sellerAddress,
           sellerPaymentAddress: existing.sellerPaymentAddress,
           price: item.price,
         });
@@ -402,6 +405,7 @@ export class BitmapService {
           vout: inscriptionUtxo.vout,
           value: inscriptionUtxo.value,
           tapInternalKey: this.psbtService.pubkeyToXOnly(item.sellerOrdinalPublicKey),
+          sellerOrdinalAddress: item.sellerAddress,
           sellerPaymentAddress: item.sellerPaymentAddress,
           price: item.price,
         });
