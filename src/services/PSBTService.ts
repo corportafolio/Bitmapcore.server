@@ -283,6 +283,11 @@ export class PSBTService {
       value: sellerTxOutput.value,
     });
 
+    psbt.addOutput({
+      address: buyerAddress,
+      value: BigInt(sellerInputData.witnessUtxo?.value || sellerTxOutput.value || 546),
+    });
+
     const marketplaceFee = Math.max(MIN_FEE, Math.floor(price * MARKETPLACE_FEE_PERCENT / 100));
     const totalNeeded = BigInt(price) + BigInt(marketplaceFee) + DUST_LIMIT;
     
@@ -733,6 +738,7 @@ export class PSBTService {
     let totalFee = 0;
 
     const sellerSigs: Array<{ partialSig: any[]; tapScriptSig: any[]; tapKeySig: any }> = [];
+    const bitmapValues: bigint[] = [];
 
     for (const listing of listings) {
       const cleanPsbt = listing.signedPsbtBase64.trim();
@@ -752,13 +758,15 @@ export class PSBTService {
         index: txInput.index,
         witnessUtxo: inputData.witnessUtxo,
         tapInternalKey: inputData.tapInternalKey,
-        sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+        sighashType: inputData.sighashType !== undefined ? inputData.sighashType : bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
       });
 
       psbt.addOutput({
-        address: buyerAddress,
-        value: BigInt(inputData.witnessUtxo?.value || txOutput.value || 546),
+        script: txOutput.script,
+        value: txOutput.value,
       });
+
+      bitmapValues.push(BigInt(inputData.witnessUtxo?.value || txOutput.value || 546));
 
       sellerSigs.push({
         partialSig: inputData.partialSig || [],
@@ -772,14 +780,15 @@ export class PSBTService {
 
     totalFee = Math.max(MIN_FEE, totalFee);
 
-    const sellerPaymentAddr = listings[0].sellerPaymentAddress || buyerAddress;
-    psbt.addOutput({
-      address: sellerPaymentAddr,
-      value: BigInt(totalPrice),
-    });
+    for (const bValue of bitmapValues) {
+      psbt.addOutput({
+        address: buyerAddress,
+        value: bValue,
+      });
+    }
 
     psbt.addOutput({
-      address: config.marketplace.feeAddress || sellerPaymentAddr,
+      address: config.marketplace.feeAddress || buyerAddress,
       value: BigInt(totalFee),
     });
 
