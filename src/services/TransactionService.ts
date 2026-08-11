@@ -214,7 +214,8 @@ export class TransactionService {
     idempotencyKey: string,
     buyerPublicKey?: string,
     buyerPaymentAddress?: string,
-    feeRate?: number
+    feeRate?: number,
+    buyerPaymentPublicKey?: string
   ): Promise<{ psbt: string; transactionId: string; expiresAt: number; marketplaceFee: number; items: Array<{ bitmapId: string; name: string; price: number; sellerAddress: string; sellerPaymentAddress: string }>; buyerInputCount: number }> {
     const paymentAddr = buyerPaymentAddress || buyerAddress;
     logger.info('Creating batch purchase PSBT', { bitmapCount: bitmapIds.length, buyerAddress, buyerPaymentAddress: paymentAddr, hasBuyerPublicKey: !!buyerPublicKey, buyerPublicKeyLength: buyerPublicKey ? buyerPublicKey.length : 0 });
@@ -272,7 +273,8 @@ export class TransactionService {
       cleanUtxos,
       buyerPublicKey,
       paymentAddr,
-      feeRate
+      feeRate,
+      buyerPaymentPublicKey
     );
 
     const expiresAt = Date.now() + config.transaction.psbtExpirationMs;

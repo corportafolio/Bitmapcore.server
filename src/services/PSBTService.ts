@@ -661,7 +661,8 @@ export class PSBTService {
     buyerUtxos: UTXO[],
     buyerPublicKey?: string,
     buyerPaymentAddress?: string,
-    feeRate?: number
+    feeRate?: number,
+    buyerPaymentPublicKey?: string
   ): Promise<{ psbt: string; marketplaceFee: number; changeValue: number; buyerInputs: Array<{ txid: string; vout: number; value: number }> }> {
     const paymentAddr = buyerPaymentAddress || buyerAddress;
     const networkFeeRate = Math.max(1, feeRate || 10);
@@ -671,6 +672,7 @@ export class PSBTService {
       buyerPaymentAddress: paymentAddr,
       utxoCount: buyerUtxos.length,
       feeRate: networkFeeRate,
+      hasBuyerPaymentPublicKey: !!buyerPaymentPublicKey,
     });
 
     const psbt = new bitcoin.Psbt({ network: NETWORK });
@@ -751,13 +753,37 @@ export class PSBTService {
     }
 
     let buyerTapInternalKey: Buffer | undefined;
-    if (buyerPublicKey) {
+    const paymentScript = bitcoin.address.toOutputScript(paymentAddr, NETWORK);
+    const paymentIsTaproot = paymentAddr.startsWith('bc1p');
+    const paymentIsP2sh = paymentAddr.startsWith('3');
+    if (buyerPublicKey && paymentIsTaproot) {
       const cleanKey = buyerPublicKey.replace(/^0x/, '');
       const xOnly = cleanKey.length === 66 ? cleanKey.slice(2) : cleanKey.slice(-64);
       buyerTapInternalKey = Buffer.from(xOnly, 'hex');
       logger.info('Buyer tapInternalKey derived from publicKey', { xOnlyLength: xOnly.length, tapInternalKeyHex: buyerTapInternalKey.toString('hex') });
-    } else {
+    } else if (paymentIsTaproot) {
       logger.warn('NO buyerPublicKey provided - buyer inputs will NOT have tapInternalKey - wallet cannot sign taproot inputs!');
+    }
+
+    let buyerRedeemScript: Buffer | undefined;
+    if (paymentIsP2sh) {
+      if (buyerPaymentPublicKey) {
+        try {
+          const cleanKey = buyerPaymentPublicKey.replace(/^0x/, '');
+          const pubkey = Buffer.from(cleanKey, 'hex');
+          const p2shP2wpkh: any = bitcoin.payments.p2wpkh({ pubkey, network: NETWORK });
+          if (p2shP2wpkh.script) {
+            buyerRedeemScript = Buffer.from(p2shP2wpkh.script);
+            logger.info('Buyer P2SH redeemScript derived from paymentPublicKey', { redeemScriptHex: buyerRedeemScript!.toString('hex') });
+          } else {
+            logger.error('Failed to derive P2SH redeemScript from paymentPublicKey - no script returned');
+          }
+        } catch (e: any) {
+          logger.error('Failed to derive P2SH redeemScript from paymentPublicKey', { error: e.message });
+        }
+      } else {
+        logger.error('Buyer payment address is P2SH but no buyerPaymentPublicKey provided - wallet cannot sign P2SH input');
+      }
     }
 
     for (const utxo of selectedUtxos) {
@@ -765,12 +791,15 @@ export class PSBTService {
         hash: utxo.txid,
         index: utxo.vout,
         witnessUtxo: {
-          script: bitcoin.address.toOutputScript(paymentAddr, NETWORK),
+          script: paymentScript,
           value: BigInt(utxo.value),
         },
       };
       if (buyerTapInternalKey) {
         input.tapInternalKey = buyerTapInternalKey;
+      }
+      if (buyerRedeemScript) {
+        input.redeemScript = buyerRedeemScript;
       }
       psbt.addInput(input);
     }
