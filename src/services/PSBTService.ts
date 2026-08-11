@@ -723,6 +723,9 @@ export class PSBTService {
   ): Promise<{ psbt: string; marketplaceFee: number; changeValue: number; buyerInputs: Array<{ txid: string; vout: number; value: number }> }> {
     const paymentAddr = buyerPaymentAddress || buyerAddress;
     const networkFeeRate = Math.max(1, feeRate || 10);
+    const paymentScript = bitcoin.address.toOutputScript(paymentAddr, NETWORK);
+    const paymentIsTaproot = paymentAddr.startsWith('bc1p');
+    const paymentIsP2sh = paymentAddr.startsWith('3');
     logger.info('Completing batch purchase PSBT', {
       listingCount: listings.length,
       buyerAddress,
@@ -792,31 +795,27 @@ export class PSBTService {
       value: BigInt(totalFee),
     });
 
-    const estimatedInputCount = listings.length + 3;
-    const estimatedOutputCount = 2 + listings.length + 1;
-    const estimatedSize = 10 + estimatedInputCount * 50 + estimatedOutputCount * 34;
-    const estimatedFee = Math.max(200, Math.ceil(estimatedSize * networkFeeRate));
-
-    const totalNeeded = BigInt(totalPrice) + BigInt(totalFee) + BigInt(estimatedFee);
-
     let selectedUtxos: UTXO[] = [];
     let totalInputValue = 0n;
+    let actualFee = Math.max(200, Math.ceil((10 + listings.length * 58 + 3 * 68 + (2 + 2 * listings.length) * 43) * networkFeeRate));
 
     for (const utxo of buyerUtxos) {
       if (!utxo.status.confirmed) continue;
       selectedUtxos.push(utxo);
       totalInputValue += BigInt(utxo.value);
+      const buyerInputVsize = paymentIsP2sh ? 91 : paymentIsTaproot ? 58 : 68;
+      actualFee = Math.max(200, Math.ceil((10 + listings.length * 58 + selectedUtxos.length * buyerInputVsize + (2 + 2 * listings.length) * 43) * networkFeeRate));
+      const totalNeeded = BigInt(totalPrice) + BigInt(totalFee) + BigInt(actualFee);
       if (totalInputValue >= totalNeeded) break;
     }
+
+    const totalNeeded = BigInt(totalPrice) + BigInt(totalFee) + BigInt(actualFee);
 
     if (totalInputValue < totalNeeded) {
       throw new ValidationError(`Saldo disponible insuficiente: se necesitan ${totalNeeded} sat, hay ${totalInputValue} sat. Los UTXOs con activos/inscripciones no se usan para pagar.`);
     }
 
     let buyerTapInternalKey: Buffer | undefined;
-    const paymentScript = bitcoin.address.toOutputScript(paymentAddr, NETWORK);
-    const paymentIsTaproot = paymentAddr.startsWith('bc1p');
-    const paymentIsP2sh = paymentAddr.startsWith('3');
     if (buyerPublicKey && paymentIsTaproot) {
       const cleanKey = buyerPublicKey.replace(/^0x/, '');
       const xOnly = cleanKey.length === 66 ? cleanKey.slice(2) : cleanKey.slice(-64);
