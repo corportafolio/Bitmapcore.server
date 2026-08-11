@@ -82,7 +82,7 @@ export class PSBTService {
         value: BigInt(inscriptionUtxo.value),
       },
       tapInternalKey: this.pubkeyToXOnly(sellerOrdinalPublicKey),
-      sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+      sighashType: bitcoin.Transaction.SIGHASH_NONE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
     });
 
     psbt.addOutput({
@@ -137,7 +137,7 @@ export class PSBTService {
         value: BigInt(inscriptionUtxo.value),
       },
       tapInternalKey: this.pubkeyToXOnly(sellerOrdinalPublicKey),
-      sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+      sighashType: bitcoin.Transaction.SIGHASH_NONE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
     });
 
     psbt.addOutput({
@@ -183,7 +183,7 @@ export class PSBTService {
           value: BigInt(input.value),
         },
         tapInternalKey: input.tapInternalKey,
-        sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+        sighashType: bitcoin.Transaction.SIGHASH_NONE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
       });
 
       psbt.addOutput({
@@ -229,7 +229,7 @@ export class PSBTService {
           value: BigInt(input.value),
         },
         tapInternalKey: input.tapInternalKey,
-        sighashType: bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+        sighashType: bitcoin.Transaction.SIGHASH_NONE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
       });
 
       psbt.addOutput({
@@ -656,12 +656,18 @@ export class PSBTService {
     listings: Array<{ signedPsbtBase64: string; price: number; sellerPaymentAddress: string; psbtIndex: number }>,
     buyerAddress: string,
     buyerUtxos: UTXO[],
-    buyerPublicKey?: string
+    buyerPublicKey?: string,
+    buyerPaymentAddress?: string,
+    feeRate?: number
   ): Promise<{ psbt: string; marketplaceFee: number; changeValue: number; buyerInputs: Array<{ txid: string; vout: number; value: number }> }> {
+    const paymentAddr = buyerPaymentAddress || buyerAddress;
+    const networkFeeRate = Math.max(1, feeRate || 10);
     logger.info('Completing batch purchase PSBT', {
       listingCount: listings.length,
       buyerAddress,
+      buyerPaymentAddress: paymentAddr,
       utxoCount: buyerUtxos.length,
+      feeRate: networkFeeRate,
     });
 
     const psbt = new bitcoin.Psbt({ network: NETWORK });
@@ -689,12 +695,12 @@ export class PSBTService {
         index: txInput.index,
         witnessUtxo: inputData.witnessUtxo,
         tapInternalKey: inputData.tapInternalKey,
-        sighashType: inputData.sighashType !== undefined ? inputData.sighashType : bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+        sighashType: bitcoin.Transaction.SIGHASH_NONE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
       });
 
       psbt.addOutput({
-        script: txOutput.script,
-        value: txOutput.value,
+        address: buyerAddress,
+        value: BigInt(inputData.witnessUtxo?.value || txOutput.value || 546),
       });
 
       sellerSigs.push({
@@ -709,12 +715,23 @@ export class PSBTService {
 
     totalFee = Math.max(MIN_FEE, totalFee);
 
+    const sellerPaymentAddr = listings[0].sellerPaymentAddress || buyerAddress;
     psbt.addOutput({
-      address: config.marketplace.feeAddress || listings[0].sellerPaymentAddress,
+      address: sellerPaymentAddr,
+      value: BigInt(totalPrice),
+    });
+
+    psbt.addOutput({
+      address: config.marketplace.feeAddress || sellerPaymentAddr,
       value: BigInt(totalFee),
     });
 
-    const totalNeeded = BigInt(totalPrice) + BigInt(totalFee) + DUST_LIMIT;
+    const estimatedInputCount = listings.length + 3;
+    const estimatedOutputCount = 2 + listings.length + 1;
+    const estimatedSize = 10 + estimatedInputCount * 50 + estimatedOutputCount * 34;
+    const estimatedFee = Math.max(200, Math.ceil(estimatedSize * networkFeeRate));
+
+    const totalNeeded = BigInt(totalPrice) + BigInt(totalFee) + BigInt(estimatedFee);
 
     let selectedUtxos: UTXO[] = [];
     let totalInputValue = 0n;
@@ -745,7 +762,7 @@ export class PSBTService {
         hash: utxo.txid,
         index: utxo.vout,
         witnessUtxo: {
-          script: bitcoin.address.toOutputScript(buyerAddress, NETWORK),
+          script: bitcoin.address.toOutputScript(paymentAddr, NETWORK),
           value: BigInt(utxo.value),
         },
       };
@@ -758,7 +775,7 @@ export class PSBTService {
     const changeValue = totalInputValue - totalNeeded;
     if (changeValue > DUST_LIMIT) {
       psbt.addOutput({
-        address: buyerAddress,
+        address: paymentAddr,
         value: changeValue,
       });
     }

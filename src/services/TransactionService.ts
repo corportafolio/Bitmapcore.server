@@ -208,12 +208,18 @@ export class TransactionService {
     bitmapIds: string[],
     buyerAddress: string,
     idempotencyKey: string,
-    buyerPublicKey?: string
-  ): Promise<{ psbt: string; transactionId: string; expiresAt: number; marketplaceFee: number; items: Array<{ bitmapId: string; name: string; price: number; sellerAddress: string }>; buyerInputCount: number }> {
-    logger.info('Creating batch purchase PSBT', { bitmapCount: bitmapIds.length, buyerAddress, hasBuyerPublicKey: !!buyerPublicKey, buyerPublicKeyLength: buyerPublicKey ? buyerPublicKey.length : 0 });
+    buyerPublicKey?: string,
+    buyerPaymentAddress?: string,
+    feeRate?: number
+  ): Promise<{ psbt: string; transactionId: string; expiresAt: number; marketplaceFee: number; items: Array<{ bitmapId: string; name: string; price: number; sellerAddress: string; sellerPaymentAddress: string }>; buyerInputCount: number }> {
+    const paymentAddr = buyerPaymentAddress || buyerAddress;
+    logger.info('Creating batch purchase PSBT', { bitmapCount: bitmapIds.length, buyerAddress, buyerPaymentAddress: paymentAddr, hasBuyerPublicKey: !!buyerPublicKey, buyerPublicKeyLength: buyerPublicKey ? buyerPublicKey.length : 0 });
 
     if (!isValidBitcoinAddress(buyerAddress)) {
       throw new ValidationError('Dirección Bitcoin del comprador inválida');
+    }
+    if (buyerPaymentAddress && !isValidBitcoinAddress(buyerPaymentAddress)) {
+      throw new ValidationError('Dirección de pago del comprador inválida');
     }
 
     const listings = [];
@@ -231,9 +237,9 @@ export class TransactionService {
       listings.push(listing);
     }
 
-    const buyerUtxos = await this.mempoolService.getUTXOs(buyerAddress);
+    const buyerUtxos = await this.mempoolService.getUTXOs(paymentAddr);
 
-    const inscribedOutputs = await this.assetService.getInscribedOutputIds(buyerAddress, buyerUtxos);
+    const inscribedOutputs = await this.assetService.getInscribedOutputIds(paymentAddr, buyerUtxos);
     const cleanUtxos = buyerUtxos.filter(utxo => !inscribedOutputs.has(`${utxo.txid}:${utxo.vout}`.toLowerCase()));
 
     logger.info('Buyer UTXOs after filtering inscribed outputs', {
@@ -260,7 +266,9 @@ export class TransactionService {
       batchInputsWithPsbt,
       buyerAddress,
       cleanUtxos,
-      buyerPublicKey
+      buyerPublicKey,
+      paymentAddr,
+      feeRate
     );
 
     const expiresAt = Date.now() + config.transaction.psbtExpirationMs;
@@ -291,6 +299,7 @@ export class TransactionService {
         name: l.name,
         price: l.price,
         sellerAddress: l.sellerAddress,
+        sellerPaymentAddress: l.sellerPaymentAddress || '',
       })),
       buyerInputCount: completedResult.buyerInputs.length,
     };

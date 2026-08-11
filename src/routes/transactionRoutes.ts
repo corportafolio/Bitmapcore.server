@@ -16,8 +16,8 @@ router.post('/buy-bitmap', validateBody(buyBitmapSchema), async (req: Request, r
 
 router.post('/batch-buy', validateBody(batchBuySchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { bitmapIds, buyerAddress, idempotencyKey, buyerPublicKey } = req.body;
-    const result = await transactionService.createBatchPSBT(bitmapIds, buyerAddress, idempotencyKey, buyerPublicKey);
+    const { bitmapIds, buyerAddress, buyerPaymentAddress, idempotencyKey, buyerPublicKey, feeRate } = req.body;
+    const result = await transactionService.createBatchPSBT(bitmapIds, buyerAddress, idempotencyKey, buyerPublicKey, buyerPaymentAddress, feeRate);
     sendSuccess(res, result);
   } catch (err) { next(err); }
 });
