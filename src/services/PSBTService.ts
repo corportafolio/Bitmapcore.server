@@ -388,7 +388,47 @@ export class PSBTService {
       }
 
       if (input.partialSig && input.partialSig.length > 0) {
-        logger.info('Input has partialSig but no finalization method', { inputIndex: i });
+        const partial = input.partialSig[0];
+        const sig = partial.signature;
+        const pubkey = partial.pubkey;
+        if (!sig || !pubkey) {
+          logger.warn('Input has partialSig without signature/pubkey', { inputIndex: i });
+          unfinalizedInputs.push(i);
+          continue;
+        }
+
+        let redeemScript = input.redeemScript;
+        if (!redeemScript) {
+          try {
+            const p2wpkh: any = bitcoin.payments.p2wpkh({ pubkey, network: NETWORK });
+            if (p2wpkh.output) {
+              redeemScript = Buffer.from(p2wpkh.output);
+              logger.info('Derived redeemScript from partialSig pubkey', { inputIndex: i });
+            }
+          } catch (e: any) {
+            logger.warn('Failed to derive redeemScript from partialSig pubkey', { inputIndex: i, error: e.message });
+          }
+        }
+
+        if (redeemScript) {
+          const scriptSig = Buffer.concat([
+            Buffer.from([redeemScript.length]),
+            redeemScript,
+          ]);
+          input.finalScriptSig = scriptSig;
+
+          const witnessItems = [Buffer.from(sig), Buffer.from(pubkey)];
+          const witnessParts: Buffer[] = [];
+          for (const item of witnessItems) {
+            witnessParts.push(Buffer.from([item.length]));
+            witnessParts.push(item);
+          }
+          input.finalScriptWitness = Buffer.concat(witnessParts);
+          logger.info('Finalized P2SH-P2WPKH input from partialSig', { inputIndex: i, sigLen: sig.length, pubkeyLen: pubkey.length });
+          continue;
+        }
+
+        logger.warn('Input has partialSig but no redeemScript - cannot finalize', { inputIndex: i });
         unfinalizedInputs.push(i);
         continue;
       }
@@ -420,7 +460,13 @@ export class PSBTService {
 
     for (const mapping of batchMappings) {
       try {
-        const sellerPsbt = bitcoin.Psbt.fromBase64(mapping.batchPsbtBase64, { network: NETWORK });
+        const cleanBatch = mapping.batchPsbtBase64.trim();
+        let sellerPsbt: bitcoin.Psbt;
+        if (/^[0-9a-fA-F]+$/.test(cleanBatch) && cleanBatch.length % 2 === 0) {
+          sellerPsbt = bitcoin.Psbt.fromBuffer(Buffer.from(cleanBatch, 'hex'), { network: NETWORK });
+        } else {
+          sellerPsbt = bitcoin.Psbt.fromBase64(cleanBatch, { network: NETWORK });
+        }
         const sellerInput = sellerPsbt.data.inputs[mapping.psbtIndex];
 
         if (sellerInput.tapKeySig) {
