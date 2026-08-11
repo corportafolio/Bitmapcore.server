@@ -418,7 +418,7 @@ export class PSBTService {
           input.finalScriptSig = scriptSig;
 
           const witnessItems = [Buffer.from(sig), Buffer.from(pubkey)];
-          const witnessParts: Buffer[] = [];
+          const witnessParts: Buffer[] = [Buffer.from([witnessItems.length])];
           for (const item of witnessItems) {
             witnessParts.push(Buffer.from([item.length]));
             witnessParts.push(item);
