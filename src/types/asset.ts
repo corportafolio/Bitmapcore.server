@@ -28,4 +28,6 @@ export interface UserAssetsResponse {
   address: string;
   collections: AssetCollection[];
   total: number;
+  lastHeight: number | null;
+  fullSync: boolean;
 }

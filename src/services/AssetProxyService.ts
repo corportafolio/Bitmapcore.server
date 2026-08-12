@@ -131,8 +131,8 @@ function limitConcurrency<T>(items: T[], concurrency: number, fn: (item: T) => P
 export class AssetProxyService {
   private baseUrl = 'https://ordinals.com';
 
-  async getUserAssets(address: string): Promise<UserAssetsResponse> {
-    logger.info('Fetching user assets', { address });
+  async getUserAssets(address: string, since?: number): Promise<UserAssetsResponse> {
+    logger.info('Fetching user assets', { address, since: since || null });
 
     const outputIds = await this.fetchOutputIds(address);
     logger.info(`Found ${outputIds.length} outputs`, { address });
@@ -149,13 +149,27 @@ export class AssetProxyService {
     logger.info(`Found ${inscriptionIds.length} inscriptions total`, { address });
 
     const inscriptions = await this.processInscriptions(inscriptionIds, address);
-    logger.info(`Processed ${inscriptions.length} inscriptions`, { address });
 
-    const collections = this.groupByCollection(inscriptions);
+    let filtered = inscriptions;
+    if (since && since > 0) {
+      filtered = inscriptions.filter(ins => ins.height === null || ins.height > since);
+      logger.info(`Filtered by since=${since}: kept ${filtered.length} of ${inscriptions.length}`, { address });
+    }
+
+    logger.info(`Processed ${filtered.length} inscriptions`, { address });
+
+    const collections = this.groupByCollection(filtered);
+    let lastHeight = 0;
+    for (const ins of filtered) {
+      if (ins.height && ins.height > lastHeight) lastHeight = ins.height;
+    }
+
     return {
       address,
       collections,
-      total: inscriptions.length
+      total: filtered.length,
+      lastHeight: lastHeight || null,
+      fullSync: !since || since <= 0
     };
   }
 
