@@ -9,7 +9,7 @@ bitcoin.initEccLib(tinysecp);
 const ECPair = ecpair.ECPairFactory(tinysecp);
 
 const NETWORK = bitcoin.networks.bitcoin;
-const DUST_LIMIT = 330n;
+const DUST_LIMIT = 546n;
 const MIN_FEE = 546;
 const MARKETPLACE_FEE_PERCENT = config.marketplace.feePercent || 2;
 
@@ -285,7 +285,7 @@ export class PSBTService {
 
     psbt.addOutput({
       address: buyerAddress,
-      value: 330n,
+      value: BigInt(sellerInputData.witnessUtxo?.value || sellerTxOutput.value || 546),
     });
 
     const marketplaceFee = Math.max(MIN_FEE, Math.floor(price * MARKETPLACE_FEE_PERCENT / 100));
@@ -769,7 +769,7 @@ export class PSBTService {
         value: txOutput.value,
       });
 
-      bitmapValues.push(330n);
+      bitmapValues.push(BigInt(inputData.witnessUtxo?.value || txOutput.value || 546));
 
       sellerSigs.push({
         partialSig: inputData.partialSig || [],
