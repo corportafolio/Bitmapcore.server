@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
-import { AssetInscription, AssetCollection, UserAssetsResponse } from '../types/asset';
+import { AssetInscription, AssetCollection, UserAssetsResponse, ParcelConfirmationsResponse } from '../types/asset';
 import { ExternalApiError } from '../errors/AppError';
 
 const BITTICK_AGENT_IDS = new Set([
@@ -436,4 +436,263 @@ export class AssetProxyService {
 
     return orderedCollections;
   }
+
+  // ========== PARCEL CONFIRMATIONS ==========
+
+  private confCacheDb: any = null;
+
+  private getConfCacheDb(): any {
+    if (this.confCacheDb) return this.confCacheDb;
+    try {
+      const path = require('path');
+      const Database = require('better-sqlite3');
+      const dbPath = path.join(__dirname, '..', '..', 'data', 'parcel_confs_cache.db');
+      const fs = require('fs');
+      if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+      this.confCacheDb = new Database(dbPath);
+      this.confCacheDb.exec('CREATE TABLE IF NOT EXISTS parcel_confs (parcel_id TEXT PRIMARY KEY, wallet_address TEXT, data TEXT, fetched_at INTEGER)');
+      return this.confCacheDb;
+    } catch (e: any) {
+      logger.error('Failed to init conf cache db', { error: e.message });
+      return null;
+    }
+  }
+
+  private async getCachedConf(parcelId: string, walletAddress: string): Promise<ParcelConfirmationsResponse | null> {
+    const db = this.getConfCacheDb();
+    if (!db) return null;
+    try {
+      const row = db.prepare('SELECT data, fetched_at FROM parcel_confs WHERE parcel_id=? AND wallet_address=?').get(parcelId, walletAddress);
+      if (!row) return null;
+      if (Date.now() - row.fetched_at > 3600000) return null;
+      return JSON.parse(row.data);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private async setCachedConf(parcelId: string, walletAddress: string, data: ParcelConfirmationsResponse): Promise<void> {
+    const db = this.getConfCacheDb();
+    if (!db) return;
+    try {
+      db.prepare('INSERT OR REPLACE INTO parcel_confs (parcel_id, wallet_address, data, fetched_at) VALUES (?,?,?,?)')
+        .run(parcelId, walletAddress, JSON.stringify(data), Date.now());
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  async getBulkParcelConfirmations(parcelIds: string[], walletAddress: string): Promise<Record<string, ParcelConfirmationsResponse>> {
+    const results: Record<string, ParcelConfirmationsResponse> = {};
+    const missing: string[] = [];
+
+    for (const pid of parcelIds) {
+      const cached = await this.getCachedConf(pid, walletAddress);
+      if (cached) {
+        results[pid] = cached;
+      } else {
+        missing.push(pid);
+      }
+    }
+
+    await limitConcurrency(missing, 5, async (pid: string) => {
+      try {
+        const conf = await this.getParcelConfirmations(pid, walletAddress);
+        results[pid] = conf;
+        await this.setCachedConf(pid, walletAddress, conf);
+      } catch (e: any) {
+        logger.error('Bulk parcel confirmation failed', { parcelId: pid, error: e.message });
+      }
+    });
+
+    return results;
+  }
+
+  async getParcelConfirmations(parcelId: string, walletAddress: string): Promise<ParcelConfirmationsResponse> {
+    logger.info('Fetching parcel confirmations', { parcelId, walletAddress });
+
+    const parcelDetail = await this.fetchParcelDetail(parcelId);
+    if (!parcelDetail) {
+      throw new ExternalApiError('No se pudo obtener metadata de la parcela');
+    }
+
+    const genesisTransaction: string | null = parcelDetail.genesisTransaction ?? (parcelDetail.output ? String(parcelDetail.output).split(':')[0] : null);
+    const height: number | null = parcelDetail.height ?? null;
+
+    if (!genesisTransaction) {
+      throw new ExternalApiError('Parcela sin genesis transaction');
+    }
+
+    if (!height) {
+      throw new ExternalApiError('Parcela sin bloque confirmado');
+    }
+
+    const tx1Confirmed = true;
+    const tx1Txid = genesisTransaction;
+    const tx1ExplorerUrl = 'https://mempool.space/tx/' + tx1Txid;
+
+    const inscriberWallet: string | null = parcelDetail.address || null;
+
+    let blockHash: string | null = null;
+    let tx2Confirmed = false;
+    let tx2Txid: string | null = null;
+    let tx2ExplorerUrl: string | null = null;
+
+    // Confirmation 2: Self-transfer of CURRENT OWNER wallet in range [genesisHeight-10, genesisHeight]
+    const conf2Result = await this.findSelfTransferInRange(inscriberWallet || walletAddress, height, genesisTransaction);
+    tx2Confirmed = conf2Result.confirmed;
+    tx2Txid = conf2Result.txid;
+    tx2ExplorerUrl = conf2Result.txid ? 'https://mempool.space/tx/' + conf2Result.txid : null;
+
+    const parcelName = parcelDetail.content || '';
+
+    // Calculate blocks before for confirmation 2
+    let blocksBefore: number | undefined;
+    let selfTransferHeight: number | undefined;
+    let selfTransferFrom: string | undefined;
+    let selfTransferTo: string | undefined;
+    
+    if (tx2Confirmed && conf2Result.txid) {
+      // Get the block height of the self-transfer tx
+      try {
+        const txDetail = await axios.get('https://blockstream.info/api/tx/' + conf2Result.txid, {
+          timeout: 15000,
+          headers: { 'User-Agent': UA }
+        });
+        selfTransferHeight = txDetail.data.status?.block_height;
+        if (selfTransferHeight && height) {
+          blocksBefore = height - selfTransferHeight;
+        }
+        // Get from/to addresses from the tx
+        const vin = txDetail.data.vin || [];
+        const vout = txDetail.data.vout || [];
+        const fromAddrs = vin.map((v: any) => v.prevout?.scriptpubkey_address).filter(Boolean);
+        const toAddrs = vout.map((v: any) => v.scriptpubkey_address).filter(Boolean);
+        selfTransferFrom = fromAddrs.join(', ');
+        selfTransferTo = toAddrs.join(', ');
+      } catch (e) {
+        // Ignore errors, fields will remain undefined
+      }
+    }
+
+    return {
+      parcelName: parcelName,
+      blockNumber: height,
+      blockHash: blockHash,
+      confirmations: [
+        {
+          type: 'parcel_inscription',
+          confirmed: tx1Confirmed,
+          txid: tx1Txid,
+          explorerUrl: tx1ExplorerUrl,
+          inscriberWallet: inscriberWallet || undefined,
+          genesisHeight: height || undefined
+        },
+        {
+          type: 'bitmap_transfer',
+          confirmed: tx2Confirmed,
+          txid: tx2Txid,
+          explorerUrl: tx2ExplorerUrl,
+          selfTransferFrom: selfTransferFrom,
+          selfTransferTo: selfTransferTo,
+          selfTransferHeight: selfTransferHeight,
+          blocksBefore: blocksBefore
+        }
+      ]
+    };
+  }
+
+  private async fetchParcelDetail(parcelId: string): Promise<any> {
+    try {
+      const response = await axios.get(this.baseUrl + '/r/inscription/' + parcelId, {
+        timeout: 15000,
+        headers: { 'User-Agent': UA }
+      });
+      return response.data;
+    } catch (error: any) {
+      logger.error('Failed to fetch parcel detail', { parcelId, error: error.message });
+      return null;
+    }
+  }
+
+  private async fetchInscriberWallet(txid: string): Promise<string | null> {
+    try {
+      const response = await axios.get('https://blockstream.info/api/tx/' + txid, {
+        timeout: 15000,
+        headers: { 'User-Agent': UA }
+      });
+      const tx = response.data;
+      if (tx && tx.vin && tx.vin.length > 0 && tx.vin[0].prevout) {
+        return tx.vin[0].prevout.scriptpubkey_address || null;
+      }
+      return null;
+    } catch (error: any) {
+      logger.error('Failed to fetch inscriber wallet', { txid, error: error.message });
+      return null;
+    }
+  }
+
+  private async fetchBlockHash(height: number): Promise<string | null> {
+    try {
+      const response = await axios.get('https://blockstream.info/api/block-height/' + height, {
+        timeout: 15000,
+        headers: { 'User-Agent': UA }
+      });
+      return response.data || null;
+    } catch (error: any) {
+      logger.error('Failed to fetch block hash', { height, error: error.message });
+      return null;
+    }
+  }
+
+  private async findSelfTransferInRange(address: string, genesisHeight: number, genesisTxid: string): Promise<{ confirmed: boolean; txid: string | null }> {
+    const minHeight = genesisHeight - 10;
+    const maxHeight = genesisHeight - 1;
+
+    // Use mempool.space address API with chain pagination (starts from genesis tx and goes backwards)
+    let afterTxid: string = genesisTxid;
+    const maxPages = 20;
+
+    for (let page = 0; page < maxPages; page++) {
+      const url = `https://mempool.space/api/address/${address}/txs/chain/${afterTxid}`;
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          if (response.status === 429) {
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
+          break;
+        }
+
+        const txs = await response.json() as any[];
+        if (!txs || txs.length === 0) break;
+
+        for (const tx of txs) {
+          if (tx.txid === genesisTxid) continue;
+          const status = tx.status;
+          const blockHeight = status?.block_height;
+          if (!blockHeight) continue;
+          if (blockHeight < minHeight) {
+            return { confirmed: false, txid: null };
+          }
+          if (blockHeight > maxHeight) continue;
+
+          // Check for self-transfer (address in both inputs and outputs)
+          const hasInput = tx.vin?.some((vin: any) => vin.prevout?.scriptpubkey_address === address);
+          const hasOutput = tx.vout?.some((vout: any) => vout.scriptpubkey_address === address);
+          if (hasInput && hasOutput) {
+            return { confirmed: true, txid: tx.txid };
+          }
+        }
+
+        afterTxid = txs[txs.length - 1].txid;
+      } catch (e) {
+        break;
+      }
+    }
+    return { confirmed: false, txid: null };
+  }
+
 }

@@ -31,3 +31,25 @@ export interface UserAssetsResponse {
   lastHeight: number | null;
   fullSync: boolean;
 }
+
+export interface ParcelConfirmation {
+  type: 'parcel_inscription' | 'bitmap_transfer';
+  confirmed: boolean;
+  txid: string | null;
+  explorerUrl: string | null;
+  // Confirmation 1 fields
+  inscriberWallet?: string;
+  genesisHeight?: number;
+  // Confirmation 2 fields
+  selfTransferFrom?: string;
+  selfTransferTo?: string;
+  selfTransferHeight?: number;
+  blocksBefore?: number;
+}
+
+export interface ParcelConfirmationsResponse {
+  parcelName: string;
+  blockNumber: number;
+  blockHash: string | null;
+  confirmations: ParcelConfirmation[];
+}

@@ -15,7 +15,8 @@ export type ErrorCode =
   | 'PSBT_EXPIRED'
   | 'PSBT_INVALID'
   | 'TRANSACTION_FAILED'
-  | 'IDEMPOTENCY_KEY_USED';
+  | 'IDEMPOTENCY_KEY_USED'
+  | 'PARCEL_CONFIRMATIONS_MISMATCH';
 
 export class AppError extends Error {
   public readonly code: ErrorCode;
@@ -51,6 +52,7 @@ export class AppError extends Error {
       PSBT_INVALID: 400,
       TRANSACTION_FAILED: 500,
       IDEMPOTENCY_KEY_USED: 409,
+      PARCEL_CONFIRMATIONS_MISMATCH: 422,
     };
     return statusCodes[code];
   }

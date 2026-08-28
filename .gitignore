@@ -12,3 +12,5 @@ coverage/
 docs/
 .opencode/
 rules/
+*.db
+*.bak

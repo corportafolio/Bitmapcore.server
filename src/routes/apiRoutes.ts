@@ -4,6 +4,8 @@ import bitmapsRouter from './bitmapsRoutes';
 import walletRouter from './walletRoutes';
 import transactionRouter from './transactionRoutes';
 import assetRouter from './assetRoutes';
+import parcelsRouter from './parcelsRoutes';
+import parcelTransactionRouter from './parcelTransactionRoutes';
 // import blockRouter from './blockRoutes';
 import { sendSuccess } from '../utils/responseFormatter';
 
@@ -37,6 +39,8 @@ router.use('/bitmaps', bitmapsRouter);
 router.use('/wallet', walletRouter);
 router.use('/transaction', transactionRouter);
 router.use('/assets', assetRouter);
+router.use('/parcels', parcelsRouter);
+router.use('/transaction', parcelTransactionRouter);
 // router.use('/block', blockRouter);
 
 export default router;
