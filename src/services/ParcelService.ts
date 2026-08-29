@@ -109,6 +109,18 @@ export class ParcelService {
 
       this.validateParcelEligible(confirmationsMap[item.inscriptionId]);
 
+      const confResult = confirmationsMap[item.inscriptionId];
+      const confArr = confResult && confResult.confirmations;
+      const confInfo = {
+        inscriberWallet: confArr && confArr[0] ? confArr[0].inscriberWallet : undefined,
+        genesisHeight: confArr && confArr[0] ? confArr[0].genesisHeight : undefined,
+        tx1Txid: confArr && confArr[0] ? confArr[0].txid : undefined,
+        selfTransferFrom: confArr && confArr[1] ? confArr[1].selfTransferFrom : undefined,
+        selfTransferTo: confArr && confArr[1] ? confArr[1].selfTransferTo : undefined,
+        selfTransferHeight: confArr && confArr[1] ? confArr[1].selfTransferHeight : undefined,
+        tx2Txid: confArr && confArr[1] ? confArr[1].txid : undefined,
+      };
+
       const parts = item.inscriptionUtxo.split(':');
       const inscriptionUtxo = {
         txid: parts[0] || '',
@@ -170,6 +182,7 @@ export class ParcelService {
       }
 
       listingIds.push(listing.id);
+      this.listingRepo.updateConfirmations(listing.id, confInfo);
       psbtInputs.push({
         txid: inscriptionUtxo.txid,
         vout: inscriptionUtxo.vout,

@@ -2,6 +2,18 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database/db';
 import { NotFoundError } from '../errors/AppError';
 
+export interface ParcelConfirmation {
+  type: string;
+  confirmed: boolean;
+  txid: string | null;
+  explorerUrl?: string | null;
+  inscriberWallet?: string;
+  genesisHeight?: number;
+  selfTransferFrom?: string;
+  selfTransferTo?: string;
+  selfTransferHeight?: number;
+}
+
 export interface ParcelListing {
   id: string;
   inscriptionId: string;
@@ -22,6 +34,7 @@ export interface ParcelListing {
   listedAt: number;
   soldAt: number | null;
   soldTxid: string | null;
+  confirmations?: ParcelConfirmation[];
 }
 
 export interface ParcelListingCreate {
@@ -35,6 +48,16 @@ export interface ParcelListingCreate {
   inscriptionUtxo: string;
   inscriptionValue: number;
   inscriptionNumber?: number;
+}
+
+export interface ParcelConfirmationInfo {
+  inscriberWallet?: string;
+  genesisHeight?: number;
+  tx1Txid?: string;
+  selfTransferFrom?: string;
+  selfTransferTo?: string;
+  selfTransferHeight?: number;
+  tx2Txid?: string;
 }
 
 interface ParcelListingRow {
@@ -56,10 +79,17 @@ interface ParcelListingRow {
   listed_at: number;
   sold_at: number | null;
   sold_txid: string | null;
+  conf_inscriber_wallet: string | null;
+  conf_genesis_height: number | null;
+  conf_tx1_txid: string | null;
+  conf_self_transfer_from: string | null;
+  conf_self_transfer_to: string | null;
+  conf_self_transfer_height: number | null;
+  conf_tx2_txid: string | null;
 }
 
 function rowToListing(row: ParcelListingRow): ParcelListing {
-  return {
+  const listing: ParcelListing = {
     id: row.id,
     inscriptionId: row.inscription_id,
     parcelId: row.parcel_id || row.inscription_id,
@@ -80,6 +110,28 @@ function rowToListing(row: ParcelListingRow): ParcelListing {
     soldAt: row.sold_at,
     soldTxid: row.sold_txid,
   };
+
+  if (row.conf_inscriber_wallet || row.conf_tx1_txid || row.conf_self_transfer_from || row.conf_tx2_txid) {
+    listing.confirmations = [
+      {
+        type: 'parcel_inscription',
+        confirmed: true,
+        txid: row.conf_tx1_txid || null,
+        inscriberWallet: row.conf_inscriber_wallet || undefined,
+        genesisHeight: row.conf_genesis_height !== null && row.conf_genesis_height !== undefined ? row.conf_genesis_height : undefined,
+      },
+      {
+        type: 'bitmap_transfer',
+        confirmed: true,
+        txid: row.conf_tx2_txid || null,
+        selfTransferFrom: row.conf_self_transfer_from || undefined,
+        selfTransferTo: row.conf_self_transfer_to || undefined,
+        selfTransferHeight: row.conf_self_transfer_height !== null && row.conf_self_transfer_height !== undefined ? row.conf_self_transfer_height : undefined,
+      },
+    ];
+  }
+
+  return listing;
 }
 
 export class ParcelListingRepository {
@@ -107,7 +159,14 @@ export class ParcelListingRepository {
         is_active INTEGER DEFAULT 0,
         listed_at INTEGER,
         sold_at INTEGER,
-        sold_txid TEXT
+        sold_txid TEXT,
+        conf_inscriber_wallet TEXT,
+        conf_genesis_height INTEGER,
+        conf_tx1_txid TEXT,
+        conf_self_transfer_from TEXT,
+        conf_self_transfer_to TEXT,
+        conf_self_transfer_height INTEGER,
+        conf_tx2_txid TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_parcel_listings_active ON parcel_listings (is_active);
       CREATE INDEX IF NOT EXISTS idx_parcel_listings_seller ON parcel_listings (seller_address);
@@ -123,6 +182,22 @@ export class ParcelListingRepository {
         sold_at INTEGER
       );
     `);
+
+    const cols = db.prepare('PRAGMA table_info(parcel_listings)').all() as Array<{ name: string }>;
+    const colNames = new Set(cols.map(c => c.name));
+    const addCol = (name: string, ddl: string) => {
+      if (!colNames.has(name)) {
+        db.exec(`ALTER TABLE parcel_listings ADD COLUMN ${name} ${ddl}`);
+      }
+    };
+    addCol('conf_inscriber_wallet', 'TEXT');
+    addCol('conf_genesis_height', 'INTEGER');
+    addCol('conf_tx1_txid', 'TEXT');
+    addCol('conf_self_transfer_from', 'TEXT');
+    addCol('conf_self_transfer_to', 'TEXT');
+    addCol('conf_self_transfer_height', 'INTEGER');
+    addCol('conf_tx2_txid', 'TEXT');
+
     ParcelListingRepository.tablesEnsured = true;
   }
 
@@ -151,6 +226,24 @@ export class ParcelListingRepository {
     );
 
     return this.findById(id)!;
+  }
+
+  updateConfirmations(id: string, conf: ParcelConfirmationInfo): void {
+    this.ensureTables();
+    const db = getDb();
+    db.prepare(`
+      UPDATE parcel_listings SET conf_inscriber_wallet = ?, conf_genesis_height = ?, conf_tx1_txid = ?, conf_self_transfer_from = ?, conf_self_transfer_to = ?, conf_self_transfer_height = ?, conf_tx2_txid = ?
+      WHERE id = ?
+    `).run(
+      conf.inscriberWallet || null,
+      conf.genesisHeight || null,
+      conf.tx1Txid || null,
+      conf.selfTransferFrom || null,
+      conf.selfTransferTo || null,
+      conf.selfTransferHeight || null,
+      conf.tx2Txid || null,
+      id
+    );
   }
 
   findById(id: string): ParcelListing | null {
@@ -283,6 +376,13 @@ export class ParcelListingRepository {
     const byInscription = this.findByInscriptionId(idOrInscriptionId);
     if (byInscription) return byInscription;
     return this.findById(idOrInscriptionId);
+  }
+
+  listAllWithIds(): Array<{ id: string; inscriptionId: string; sellerAddress: string }> {
+    this.ensureTables();
+    const db = getDb();
+    const rows = db.prepare('SELECT id, inscription_id, seller_address FROM parcel_listings').all() as Array<{ id: string; inscription_id: string; seller_address: string }>;
+    return rows.map(r => ({ id: r.id, inscriptionId: r.inscription_id, sellerAddress: r.seller_address }));
   }
 }
 
