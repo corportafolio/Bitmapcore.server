@@ -18,15 +18,16 @@ export class ParcelService {
     this.assetProxyService = new AssetProxyService();
   }
 
-  private async validateParcelEligible(inscriptionId: string, walletAddress: string): Promise<void> {
-    let confResult;
+  private async fetchBulkConfirmations(inscriptionIds: string[], walletAddress: string): Promise<Record<string, any>> {
     try {
-      confResult = await this.assetProxyService.getParcelConfirmations(inscriptionId, walletAddress);
+      return await this.assetProxyService.getBulkParcelConfirmations(inscriptionIds, walletAddress);
     } catch (e: any) {
-      logger.warn('Error fetching parcel confirmations for eligibility', { inscriptionId, error: e?.message });
-      throw new ValidationError('No se pudo verificar las confirmaciones de la parcela');
+      logger.warn('Error fetching bulk parcel confirmations', { count: inscriptionIds.length, error: e?.message });
+      throw new ValidationError('No se pudo verificar las confirmaciones de las parcelas');
     }
+  }
 
+  private validateParcelEligible(confResult: any): void {
     const confirmations = confResult && confResult.confirmations;
     const tx1 = confirmations && confirmations[0];
     const tx2 = confirmations && confirmations[1];
@@ -95,6 +96,9 @@ export class ParcelService {
       price: number;
     }> = [];
 
+    const sellerAddress = items.length > 0 ? items[0].sellerAddress : '';
+    const confirmationsMap = await this.fetchBulkConfirmations(items.map(i => i.inscriptionId), sellerAddress);
+
     for (const item of items) {
       if (!isValidBitcoinAddress(item.sellerAddress)) {
         throw new ValidationError('Invalid seller Bitcoin address');
@@ -103,7 +107,7 @@ export class ParcelService {
         throw new ValidationError('Invalid seller payment address');
       }
 
-      await this.validateParcelEligible(item.inscriptionId, item.sellerAddress);
+      this.validateParcelEligible(confirmationsMap[item.inscriptionId]);
 
       const parts = item.inscriptionUtxo.split(':');
       const inscriptionUtxo = {
@@ -113,6 +117,8 @@ export class ParcelService {
       };
 
       const existing = this.listingRepo.findByInscriptionId(item.inscriptionId);
+
+      let listing: ParcelListing;
 
       if (item.isPriceUpdate && existing) {
         if (!existing.isActive) {
@@ -129,51 +135,50 @@ export class ParcelService {
           price: item.price,
           listedAt: Date.now(),
           psbtStatus: 'pending',
+          signedPsbt: '',
         });
 
-        listingIds.push(existing.id);
-        psbtInputs.push({
-          txid: inscriptionUtxo.txid,
-          vout: inscriptionUtxo.vout,
-          value: inscriptionUtxo.value,
-          tapInternalKey: this.psbtService.pubkeyToXOnly(existing.sellerOrdinalPublicKey),
-          sellerOrdinalAddress: existing.sellerAddress,
-          sellerPaymentAddress: existing.sellerPaymentAddress,
-          price: item.price,
-        });
+        listing = this.listingRepo.findById(existing.id)!;
       } else {
         if (existing && existing.isActive) {
           throw new ValidationError('La parcela ya esta listada para la venta');
         }
 
         if (existing && !existing.isActive) {
-          this.listingRepo.deactivate(existing.id);
+          this.listingRepo.updatePsbtFields(existing.id, {
+            price: item.price,
+            listedAt: Date.now(),
+            psbtStatus: 'pending',
+            isActive: false,
+            signedPsbt: '',
+          });
+          listing = this.listingRepo.findById(existing.id)!;
+        } else {
+          listing = this.listingRepo.create({
+            inscriptionId: item.inscriptionId,
+            parcelId: item.parcelId || item.inscriptionId,
+            name: item.name,
+            price: item.price,
+            sellerAddress: item.sellerAddress,
+            sellerPaymentAddress: item.sellerPaymentAddress,
+            sellerOrdinalPublicKey: item.sellerOrdinalPublicKey,
+            inscriptionUtxo: item.inscriptionUtxo,
+            inscriptionValue: item.inscriptionValue,
+            inscriptionNumber: item.inscriptionNumber,
+          });
         }
-
-        const listing = this.listingRepo.create({
-          inscriptionId: item.inscriptionId,
-          parcelId: item.parcelId || item.inscriptionId,
-          name: item.name,
-          price: item.price,
-          sellerAddress: item.sellerAddress,
-          sellerPaymentAddress: item.sellerPaymentAddress,
-          sellerOrdinalPublicKey: item.sellerOrdinalPublicKey,
-          inscriptionUtxo: item.inscriptionUtxo,
-          inscriptionValue: item.inscriptionValue,
-          inscriptionNumber: item.inscriptionNumber,
-        });
-
-        listingIds.push(listing.id);
-        psbtInputs.push({
-          txid: inscriptionUtxo.txid,
-          vout: inscriptionUtxo.vout,
-          value: inscriptionUtxo.value,
-          tapInternalKey: this.psbtService.pubkeyToXOnly(item.sellerOrdinalPublicKey),
-          sellerOrdinalAddress: item.sellerAddress,
-          sellerPaymentAddress: item.sellerPaymentAddress,
-          price: item.price,
-        });
       }
+
+      listingIds.push(listing.id);
+      psbtInputs.push({
+        txid: inscriptionUtxo.txid,
+        vout: inscriptionUtxo.vout,
+        value: inscriptionUtxo.value,
+        tapInternalKey: this.psbtService.pubkeyToXOnly(item.sellerOrdinalPublicKey),
+        sellerOrdinalAddress: item.sellerAddress,
+        sellerPaymentAddress: item.sellerPaymentAddress,
+        price: item.price,
+      });
     }
 
     const combinedPsbt = await this.psbtService.createBatchListingPSBT(psbtInputs);
@@ -202,7 +207,7 @@ export class ParcelService {
     const isCombined = signedPsbtHexs.length === 1 && listingIds.length > 1;
 
     if (!isCombined && listingIds.length !== signedPsbtHexs.length) {
-      throw new ValidationError(`Mismatch: ${listingIds.length} listings but ${signedPsbtHexs.length} signed PSBTs`);
+      throw new ValidationError(`Se recibieron ${signedPsbtHexs.length} firmas para ${listingIds.length} parcelas. Todas deben firmarse para activar el listado.`);
     }
 
     if (isCombined) {
