@@ -70,7 +70,8 @@ function runMigrations(database: Database.Database): void {
       seller_payment_address TEXT,
       unsigned_psbt TEXT,
       signed_psbt TEXT,
-      psbt_status TEXT DEFAULT 'created'
+      psbt_status TEXT DEFAULT 'created',
+      collection TEXT DEFAULT 'bitmaps'
     );
 
     CREATE TABLE IF NOT EXISTS transactions (
@@ -166,6 +167,11 @@ function runPsbtMigrations(database: Database.Database): void {
       logger.info('Adding PSBT column to listings', { column: col.name });
       database.exec(`ALTER TABLE listings ADD COLUMN ${col.name} ${col.type}`);
     }
+  }
+
+  if (!columnNames.includes('collection')) {
+    logger.info('Adding collection column to listings');
+    database.exec(`ALTER TABLE listings ADD COLUMN collection TEXT DEFAULT 'bitmaps'`);
   }
 }
 

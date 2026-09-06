@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { BitmapService } from '../services/BitmapService';
 import bitmapsRouter from './bitmapsRoutes';
+import listingsRouter from './listingsRoutes';
 import walletRouter from './walletRoutes';
 import transactionRouter from './transactionRoutes';
 import assetRouter from './assetRoutes';
@@ -36,6 +37,7 @@ router.get('/verify-bitmap/:id', async (req: Request, res: Response) => {
 });
 
 router.use('/bitmaps', bitmapsRouter);
+router.use('/listings', listingsRouter);
 router.use('/wallet', walletRouter);
 router.use('/transaction', transactionRouter);
 router.use('/assets', assetRouter);

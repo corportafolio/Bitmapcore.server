@@ -28,6 +28,7 @@ export interface BitmapListing {
   unsignedPsbt?: string;
   signedPsbt?: string;
   psbtStatus?: 'pending' | 'created' | 'signed' | 'sold' | 'expired';
+  collection?: string;
 }
 
 export interface BitmapListingCreate {
@@ -51,6 +52,8 @@ export interface BitmapListingCreate {
   inscriptionValue?: number;
   inscriptionContentType?: string;
   inscriptionHeight?: number;
+  // Colección (bitmaps | bittick | parcels, ...) — tabla única
+  collection?: string;
 }
 
 export interface BitmapListingUpdate {

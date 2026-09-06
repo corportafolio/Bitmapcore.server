@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { TransactionService } from '../services/TransactionService';
-import { validateBody, buyBitmapSchema, broadcastSchema, validateUUID, batchBuySchema, batchBroadcastSchema } from '../middleware/validation';
+import { validateBody, buyBitmapSchema, broadcastSchema, validateUUID, batchBuySchema, batchBroadcastSchema, unifiedBuySchema, unifiedBroadcastSchema } from '../middleware/validation';
 import { sendSuccess } from '../utils/responseFormatter';
 
 const router: Router = Router();
@@ -22,6 +22,15 @@ router.post('/batch-buy', validateBody(batchBuySchema), async (req: Request, res
   } catch (err) { next(err); }
 });
 
+// Endpoint unificado de compra: { collection, ids, ... } — cualquier colección
+router.post('/batch-buy-unified', validateBody(unifiedBuySchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { ids, buyerAddress, buyerPaymentAddress, buyerPaymentPublicKey, idempotencyKey, buyerPublicKey, feeRate } = req.body;
+    const result = await transactionService.createBatchPSBT(ids, buyerAddress, idempotencyKey, buyerPublicKey, buyerPaymentAddress, feeRate, buyerPaymentPublicKey);
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+});
+
 router.post('/broadcast', validateBody(broadcastSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { signedPsbt, transactionId } = req.body;
@@ -31,6 +40,15 @@ router.post('/broadcast', validateBody(broadcastSchema), async (req: Request, re
 });
 
 router.post('/batch-broadcast', validateBody(batchBroadcastSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { signedPsbt, transactionId } = req.body;
+    const result = await transactionService.batchBroadcast(signedPsbt, transactionId);
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+});
+
+// Endpoint unificado de broadcast: acepta collection opcional (mismo body que batch-broadcast)
+router.post('/batch-broadcast-unified', validateBody(unifiedBroadcastSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { signedPsbt, transactionId } = req.body;
     const result = await transactionService.batchBroadcast(signedPsbt, transactionId);

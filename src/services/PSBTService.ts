@@ -114,7 +114,8 @@ export class PSBTService {
     newPrice: number,
     sellerOrdinalPublicKey: string,
     clientUtxo: string,
-    clientValue: number
+    clientValue: number,
+    sellerOrdinalAddress?: string
   ): Promise<ListingPSBTData> {
     logger.info('Creating price update PSBT', { inscriptionId, sellerPaymentAddress, newPrice });
 
@@ -134,7 +135,7 @@ export class PSBTService {
       hash: inscriptionUtxo.txid,
       index: inscriptionUtxo.vout,
       witnessUtxo: {
-        script: bitcoin.address.toOutputScript(sellerPaymentAddress, NETWORK),
+        script: bitcoin.address.toOutputScript(sellerOrdinalAddress || sellerPaymentAddress, NETWORK),
         value: BigInt(inscriptionUtxo.value),
       },
       tapInternalKey: this.pubkeyToXOnly(sellerOrdinalPublicKey),

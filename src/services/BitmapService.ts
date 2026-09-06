@@ -149,7 +149,8 @@ export class BitmapService {
       newPrice,
       listing.sellerOrdinalPublicKey,
       clientUtxo,
-      clientValue
+      clientValue,
+      listing.sellerAddress
     );
 
     this.listingRepo.updatePsbtFields(listingId, {
@@ -293,23 +294,27 @@ export class BitmapService {
     return this.listingRepo.findSoldSince(sinceTimestamp);
   }
 
-  async createBatchListing(items: Array<{
-    inscriptionId: string;
-    price: number;
-    sellerAddress: string;
-    sellerOrdinalPublicKey: string;
-    sellerPaymentAddress: string;
-    name: string;
-    imageUrl: string;
-    bitmapNumber: number;
-    inscriptionNumber: number;
-    inscriptionUtxo: string;
-    inscriptionValue: number;
-    inscriptionContentType: string;
-    inscriptionHeight: number;
-    isPriceUpdate: boolean;
-  }>): Promise<{ listingIds: string[]; psbtToSign: string; psbtToSigns: Array<{ listingId: string; unsignedPsbtHex: string }> }> {
-    logger.info('Creating batch listing', { count: items.length });
+  async createBatchListing(
+    items: Array<{
+      inscriptionId: string;
+      price: number;
+      sellerAddress: string;
+      sellerOrdinalPublicKey: string;
+      sellerPaymentAddress: string;
+      name: string;
+      imageUrl: string;
+      bitmapNumber: number;
+      inscriptionNumber: number;
+      inscriptionUtxo: string;
+      inscriptionValue: number;
+      inscriptionContentType: string;
+      inscriptionHeight: number;
+      isPriceUpdate: boolean;
+    }>,
+    collection: string = 'bitmaps'
+  ): Promise<{ listingIds: string[]; psbtToSign: string; psbtToSigns: Array<{ listingId: string; unsignedPsbtHex: string }> }> {
+    const isBitmap = collection === 'bitmaps';
+    logger.info('Creating batch listing', { count: items.length, collection });
 
     const listingIds: string[] = [];
     const psbtInputs: Array<{
@@ -329,7 +334,7 @@ export class BitmapService {
       if (!isValidBitcoinAddress(item.sellerPaymentAddress)) {
         throw new ValidationError('Invalid seller payment address');
       }
-      if (item.inscriptionContentType && !item.inscriptionContentType.startsWith('text/plain')) {
+      if (isBitmap && item.inscriptionContentType && !item.inscriptionContentType.startsWith('text/plain')) {
         throw new ValidationError('Esta inscripción no es un bitmap válido');
       }
 
@@ -397,6 +402,7 @@ export class BitmapService {
           ownerAddress: item.sellerAddress,
           sellerOrdinalPublicKey: item.sellerOrdinalPublicKey,
           sellerPaymentAddress: item.sellerPaymentAddress,
+          collection,
         });
 
         listingIds.push(listing.id);

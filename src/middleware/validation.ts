@@ -90,17 +90,32 @@ export const batchListItemSchema = z.object({
   sellerPaymentAddress: z.string().min(26).max(62),
   name: z.string().min(1).max(255),
   imageUrl: z.string().url().or(z.literal('')),
-  bitmapNumber: z.number().positive(),
-  inscriptionNumber: z.number().positive(),
+  bitmapNumber: z.number().nonnegative().optional(),
+  inscriptionNumber: z.number().nonnegative().optional(),
   inscriptionUtxo: z.string().min(1),
   inscriptionValue: z.number().positive(),
   inscriptionContentType: z.string().optional(),
   inscriptionHeight: z.number().optional(),
   isPriceUpdate: z.boolean(),
+  collection: z.string().optional(),
 });
 
 export const batchListSchema = z.object({
   items: z.array(batchListItemSchema).min(1),
+});
+
+// Endpoint unificado: /api/v1/listings/batch  → { collection, items }
+export const unifiedListSchema = z.object({
+  collection: z.string().min(1).max(60),
+  items: z.array(batchListItemSchema).min(1),
+});
+
+// Endpoint unificado: /api/v1/listings/batch/sign → { collection, listingIds, signedPsbtHexs, sellerOrdinalPublicKey }
+export const unifiedSignSchema = z.object({
+  collection: z.string().min(1).max(60).optional(),
+  listingIds: z.array(z.string().uuid()).min(1),
+  signedPsbtHexs: z.array(z.string().min(20)).min(1),
+  sellerOrdinalPublicKey: z.string().min(64).max(130),
 });
 
 export const batchSignSchema = z.object({
@@ -117,6 +132,24 @@ export const batchBuySchema = z.object({
   idempotencyKey: z.string().min(1).max(100),
   buyerPublicKey: z.string().min(64).max(130).optional(),
   feeRate: z.number().min(1).max(100).optional(),
+});
+
+// Endpoint unificado de compra: acepta { collection, ids } (cualquier colección)
+export const unifiedBuySchema = z.object({
+  collection: z.string().min(1).max(60),
+  ids: z.array(z.string().uuid()).min(1).max(500),
+  buyerAddress: z.string().min(26).max(62),
+  buyerPaymentAddress: z.string().min(26).max(62).optional(),
+  buyerPaymentPublicKey: z.string().min(64).max(130).nullish(),
+  idempotencyKey: z.string().min(1).max(100),
+  buyerPublicKey: z.string().min(64).max(130).optional(),
+  feeRate: z.number().min(1).max(100).optional(),
+});
+
+export const unifiedBroadcastSchema = z.object({
+  collection: z.string().min(1).max(60).optional(),
+  signedPsbt: z.string().min(20),
+  transactionId: z.string().min(1),
 });
 
 export const batchBroadcastSchema = z.object({

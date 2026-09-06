@@ -24,6 +24,7 @@ interface ListingRow {
   unsigned_psbt: string | null;
   signed_psbt: string | null;
   psbt_status: string | null;
+  collection?: string;
   etiquetas?: string;
   totalTransacciones?: string;
   hash?: string;
@@ -54,6 +55,7 @@ function rowToListing(row: ListingRow): BitmapListing {
     unsignedPsbt: row.unsigned_psbt || undefined,
     signedPsbt: row.signed_psbt || undefined,
     psbtStatus: (row.psbt_status as 'pending' | 'created' | 'signed' | 'sold' | 'expired') || undefined,
+    collection: row.collection || 'bitmaps',
     etiquetas: row.etiquetas,
     totalTransacciones: row.totalTransacciones,
     hash: row.hash,
@@ -83,8 +85,8 @@ export class ListingRepository {
     const now = Date.now();
 
     const stmt = db.prepare(`
-      INSERT INTO listings (id, inscription_id, name, description, price, seller_address, listed_at, image_url, is_active, bitmap_number, inscription_number, bitmap_hash, owner_address, seller_ordinal_public_key, seller_payment_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
+      INSERT INTO listings (id, inscription_id, name, description, price, seller_address, listed_at, image_url, is_active, bitmap_number, inscription_number, bitmap_hash, owner_address, seller_ordinal_public_key, seller_payment_address, collection)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -101,7 +103,8 @@ export class ListingRepository {
       data.bitmapHash || null,
       data.ownerAddress || null,
       data.sellerOrdinalPublicKey || null,
-      data.sellerPaymentAddress || null
+      data.sellerPaymentAddress || null,
+      data.collection || 'bitmaps'
     );
 
     return this.findById(id)!;
