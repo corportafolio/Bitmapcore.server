@@ -118,6 +118,9 @@ function runMigrations(database: Database.Database): void {
       description TEXT,
       supply INTEGER DEFAULT 0,
       icon_inscription_id TEXT,
+      image TEXT,
+      x_account TEXT,
+      discord TEXT,
       items_json TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -186,6 +189,26 @@ function runPsbtMigrations(database: Database.Database): void {
   if (!columnNames.includes('collection')) {
     logger.info('Adding collection column to listings');
     database.exec(`ALTER TABLE listings ADD COLUMN collection TEXT DEFAULT 'bitmaps'`);
+  }
+
+  // Migración idempotente para la tabla `collections`
+  try {
+    const colCols = database.pragma('table_info(collections)') as Array<{ name: string }>;
+    const colNames = colCols.map(c => c.name);
+    const addCol = [
+      { name: 'image', type: 'TEXT' },
+      { name: 'x_account', type: 'TEXT' },
+      { name: 'discord', type: 'TEXT' },
+    ];
+    for (const col of addCol) {
+      if (!colNames.includes(col.name)) {
+        logger.info('Adding column to collections', { column: col.name });
+        database.exec(`ALTER TABLE collections ADD COLUMN ${col.name} ${col.type}`);
+      }
+    }
+  } catch (e: any) {
+    // La tabla collections puede no existir aún en algunos entornos; no es fatal
+    logger.warn('collections migration skipped', { message: e.message });
   }
 }
 

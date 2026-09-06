@@ -715,7 +715,7 @@ export class AssetProxyService {
   async getCollections(): Promise<any[]> {
     const { getDb } = require('../database/db');
     const db = getDb();
-    const rows = db.prepare('SELECT id, slug, name, description, supply, icon_inscription_id, created_at FROM collections ORDER BY created_at DESC').all();
+    const rows = db.prepare('SELECT id, slug, name, description, supply, icon_inscription_id, image, x_account, discord, created_at FROM collections ORDER BY created_at DESC').all();
     return rows;
   }
 
@@ -730,23 +730,42 @@ export class AssetProxyService {
       description: row.description,
       supply: row.supply,
       icon_inscription_id: row.icon_inscription_id,
+      image: row.image || null,
+      x_account: row.x_account || null,
+      discord: row.discord || null,
       items: JSON.parse(row.items_json || '[]'),
       total: JSON.parse(row.items_json || '[]').length
     };
   }
 
-  async registerCollection(slug: string, meta: any, items: any[]): Promise<any> {
+  async registerCollection(opts: {
+    slug: string;
+    meta: any;
+    items: any[];
+    image?: string | null;   // data URL base64 PNG
+    xAccount?: string | null;
+    discord?: string | null;
+  }): Promise<any> {
     const { getDb } = require('../database/db');
     const db = getDb();
     const now = Math.floor(Date.now() / 1000);
+    const meta = opts.meta || {};
+    const slug = opts.slug;
+    const image = opts.image || null;
+    const xAccount = opts.xAccount || null;
+    const discord = opts.discord || null;
+    const name = meta.name || slug;
+    const description = meta.description || null;
+    const supply = parseInt(meta.supply) || (Array.isArray(opts.items) ? opts.items.length : 0);
+
     const existing = db.prepare('SELECT id FROM collections WHERE slug = ?').get(slug);
     if (existing) {
-      db.prepare('UPDATE collections SET name = ?, description = ?, supply = ?, icon_inscription_id = ?, items_json = ?, updated_at = ? WHERE slug = ?')
-        .run(meta.name, meta.description, parseInt(meta.supply) || 0, meta.icon, JSON.stringify(items), now, slug);
+      db.prepare('UPDATE collections SET name = ?, description = ?, supply = ?, icon_inscription_id = ?, image = ?, x_account = ?, discord = ?, items_json = ?, updated_at = ? WHERE slug = ?')
+        .run(name, description, supply, meta.icon || null, image, xAccount, discord, JSON.stringify(opts.items || []), now, slug);
       return { slug, action: 'updated' };
     }
-    db.prepare('INSERT INTO collections (slug, name, description, supply, icon_inscription_id, items_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(slug, meta.name, meta.description, parseInt(meta.supply) || 0, meta.icon, JSON.stringify(items), now, now);
+    db.prepare('INSERT INTO collections (slug, name, description, supply, icon_inscription_id, image, x_account, discord, items_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(slug, name, description, supply, meta.icon || null, image, xAccount, discord, JSON.stringify(opts.items || []), now, now);
     return { slug, action: 'created' };
   }
 
