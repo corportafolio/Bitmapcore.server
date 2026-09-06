@@ -17,6 +17,17 @@ router.get('/address/:address', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/v1/assets/bittick-agents
+// Returns all 100 Bittick Agents
+router.get('/bittick-agents', async (req: Request, res: Response) => {
+  try {
+    const agents = await assetProxyService.getBittickAgents();
+    sendSuccess(res, { agents, total: agents.length });
+  } catch (error: any) {
+    sendError(res, 'BITTICK_AGENTS_FAILED', error.message || 'Error fetching Bittick agents', 500);
+  }
+});
+
 // GET /api/v1/assets/parcels/confirmations?address=X&parcels=a,b,c
 // Bulk confirmations for all parcels in one call (with server-side cache)
 router.get('/parcels/confirmations', async (req: Request, res: Response) => {
@@ -55,6 +66,51 @@ router.get('/parcels/:parcelId/confirmations', async (req: Request, res: Respons
     sendSuccess(res, result);
   } catch (error: any) {
     sendError(res, 'PARCEL_CONFIRMATIONS_FAILED', error.message || 'Error fetching parcel confirmations', 500);
+  }
+});
+
+
+// GET /api/v1/assets/collections
+// List all registered collections
+router.get('/collections', async (req: Request, res: Response) => {
+  try {
+    const collections = await assetProxyService.getCollections();
+    sendSuccess(res, { collections, total: collections.length });
+  } catch (error: any) {
+    sendError(res, 'COLLECTIONS_FAILED', error.message || 'Error fetching collections', 500);
+  }
+});
+
+// GET /api/v1/assets/collections/:slug
+// Get collection details + items
+router.get('/collections/:slug', async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const collection = await assetProxyService.getCollectionBySlug(slug);
+    if (!collection) {
+      return sendError(res, 'COLLECTION_NOT_FOUND', 'Collection not found', 404);
+    }
+    sendSuccess(res, collection);
+  } catch (error: any) {
+    sendError(res, 'COLLECTION_FAILED', error.message || 'Error fetching collection', 500);
+  }
+});
+
+// POST /api/v1/assets/collections/register
+// Register or update a collection (requires meta.json + inscriptions.json)
+router.post('/collections/register', async (req: Request, res: Response) => {
+  try {
+    const { slug, meta, items } = req.body;
+    if (!slug || !meta || !items || !Array.isArray(items)) {
+      return sendError(res, 'INVALID_PAYLOAD', 'slug, meta, and items array required', 400);
+    }
+    if (!meta.name || !meta.slug || !meta.supply) {
+      return sendError(res, 'INVALID_META', 'meta must have name, slug, supply', 400);
+    }
+    const result = await assetProxyService.registerCollection(slug, meta, items);
+    sendSuccess(res, result);
+  } catch (error: any) {
+    sendError(res, 'REGISTER_FAILED', error.message || 'Error registering collection', 500);
   }
 });
 

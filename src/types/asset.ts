@@ -16,6 +16,9 @@ export interface AssetInscription {
   imageContentType: string | null;
   output: string | null;
   value: number | null;
+  runeSymbol?: string | null;
+  runeBalance?: string | null;
+  runeName?: string | null;
 }
 
 export interface AssetCollection {
@@ -52,4 +55,45 @@ export interface ParcelConfirmationsResponse {
   blockNumber: number;
   blockHash: string | null;
   confirmations: ParcelConfirmation[];
+}
+
+export interface CollectionItem {
+  id: string;
+  meta: {
+    name: string;
+    attributes?: Array<{
+      trait_type: string;
+      value: string;
+    }>;
+  };
+}
+
+export interface CollectionMeta {
+  name: string;
+  slug: string;
+  description: string;
+  supply: string;
+  icon: string;
+}
+
+export interface Collection {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  supply: number;
+  icon_inscription_id: string;
+  items_json: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CollectionResponse {
+  slug: string;
+  name: string;
+  description: string;
+  supply: number;
+  icon_inscription_id: string;
+  items: CollectionItem[];
+  total: number;
 }

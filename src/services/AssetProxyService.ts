@@ -695,4 +695,64 @@ export class AssetProxyService {
     return { confirmed: false, txid: null };
   }
 
+
+
+  // ========== BITTICK AGENTS ==========
+
+  async getBittickAgents(): Promise<AssetInscription[]> {
+    const ids = Array.from(BITTICK_AGENT_IDS);
+    logger.info("Fetching Bittick Agents", { total: ids.length });
+    const results = await limitConcurrency(ids, 10, async (id: string) => {
+      return this.processSingleInscription(id, "");
+    });
+    const agents = results.filter((r): r is AssetInscription => r !== null);
+    agents.sort((a, b) => b.inscriptionNumber - a.inscriptionNumber);
+    logger.info("Bittick Agents loaded", { count: agents.length });
+    return agents;
+  }
+  // ========== COLLECTIONS ==========
+
+  async getCollections(): Promise<any[]> {
+    const { getDb } = require('../database/db');
+    const db = getDb();
+    const rows = db.prepare('SELECT id, slug, name, description, supply, icon_inscription_id, created_at FROM collections ORDER BY created_at DESC').all();
+    return rows;
+  }
+
+  async getCollectionBySlug(slug: string): Promise<any | null> {
+    const { getDb } = require('../database/db');
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM collections WHERE slug = ?').get(slug);
+    if (!row) return null;
+    return {
+      slug: row.slug,
+      name: row.name,
+      description: row.description,
+      supply: row.supply,
+      icon_inscription_id: row.icon_inscription_id,
+      items: JSON.parse(row.items_json || '[]'),
+      total: JSON.parse(row.items_json || '[]').length
+    };
+  }
+
+  async registerCollection(slug: string, meta: any, items: any[]): Promise<any> {
+    const { getDb } = require('../database/db');
+    const db = getDb();
+    const now = Math.floor(Date.now() / 1000);
+    const existing = db.prepare('SELECT id FROM collections WHERE slug = ?').get(slug);
+    if (existing) {
+      db.prepare('UPDATE collections SET name = ?, description = ?, supply = ?, icon_inscription_id = ?, items_json = ?, updated_at = ? WHERE slug = ?')
+        .run(meta.name, meta.description, parseInt(meta.supply) || 0, meta.icon, JSON.stringify(items), now, slug);
+      return { slug, action: 'updated' };
+    }
+    db.prepare('INSERT INTO collections (slug, name, description, supply, icon_inscription_id, items_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(slug, meta.name, meta.description, parseInt(meta.supply) || 0, meta.icon, JSON.stringify(items), now, now);
+    return { slug, action: 'created' };
+  }
+
+  async getCollectionItems(slug: string): Promise<any[]> {
+    const col = await this.getCollectionBySlug(slug);
+    if (!col) return [];
+    return col.items;
+  }
 }

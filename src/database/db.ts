@@ -111,6 +111,20 @@ function runMigrations(database: Database.Database): void {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS collections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      supply INTEGER DEFAULT 0,
+      icon_inscription_id TEXT,
+      items_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_collections_slug ON collections(slug);
+
+
     CREATE TABLE IF NOT EXISTS batch_listings (
       id TEXT PRIMARY KEY,
       listing_id TEXT NOT NULL,
